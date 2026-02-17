@@ -5,6 +5,7 @@ The main brain: Receive → Enhance → Plan → Execute → Observe → Respond
 Created: 2026-02-15
 """
 
+import threading
 import json
 import time
 from typing import Callable, Generator
@@ -49,6 +50,7 @@ class AgentCore:
         self.model_override = model_override
         self.chat_id = generate_id("chat_")
         self._response_callbacks: list[Callable] = []
+        self._lock = threading.Lock()
 
         # Initialize with system prompt
         system_msg = self.prompt_enhancer.get_system_prompt()
@@ -74,14 +76,14 @@ class AgentCore:
     def chat(self, user_message: str, stream: bool = True) -> str:
         """
         Process a user message through the agent loop.
-
-        Args:
-            user_message: The user's text input
-            stream: Whether to stream the response
-
-        Returns:
-            The agent's final text response
+        
+        Thread-safe: serializes access to prevent concurrent history modification.
         """
+        with self._lock:
+            return self._chat_unsafe(user_message, stream)
+
+    def _chat_unsafe(self, user_message: str, stream: bool = True) -> str:
+        """Internal chat logic (not thread-safe)."""
         turn_start = time.time()
 
         # 1. Enhance & add user message
