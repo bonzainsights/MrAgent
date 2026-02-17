@@ -20,10 +20,10 @@ logger = get_logger("agents.model_selector")
 
 # Default model for each mode (first pick when switching mode)
 MODE_DEFAULTS = {
-    "thinking": "kimi-k2.5",
+    "thinking": "gpt-oss-120b",
     "fast": "gemma-3n",
     "code": "qwen3-coder",
-    "general": "llama-3.3-70b",
+    "general": "gpt-oss-120b",
 }
 
 # Keyword patterns for auto-classification
@@ -131,7 +131,7 @@ class ModelSelector:
                 msg_lower
             ))
             if needs_tools:
-                model = MODE_DEFAULTS["thinking"]  # kimi-k2.5 supports tools
+                model = MODE_DEFAULTS["thinking"]  # gpt-oss-120b supports tools
                 self.logger.info(f"Upgraded to tool-capable model: {model}")
 
         return model

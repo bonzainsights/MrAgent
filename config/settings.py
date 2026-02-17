@@ -49,6 +49,7 @@ NVIDIA_KEYS = {
     "gemma_3n":      os.getenv("NVIDIA_GEMMA_3N", ""),
     "qwen3_coder":   os.getenv("NVIDIA_QWEN3_CODER", ""),
     "llama_33_70b":  os.getenv("NVIDIA_LLAMA3_3_70B_INSTRUCT", ""),
+    "gpt_oss_120b":  os.getenv("NVIDIA_GPT_OSS_120B", ""),
 }
 
 # Other provider keys
@@ -128,6 +129,16 @@ MODEL_REGISTRY = {
         "description": "Reliable fallback, strong general-purpose LLM",
     },
 
+    "gpt-oss-120b": {
+        "id": "openai/gpt-oss-120b",
+        "key": "gpt_oss_120b",
+        "type": "llm",
+        "categories": ["thinking", "fast", "code"],
+        "context_window": 128_000,
+        "supports_tools": True,
+        "description": "Open reasoning & coding model (Default)",
+    },
+
     # Image Models — verified from build.nvidia.com (2026-02-16)
     # Note: SD 3.5 Large has NO hosted API — download only. Using SD 3 Medium instead.
     "sd-3-medium": {
@@ -163,7 +174,7 @@ MODEL_REGISTRY = {
 # Default Settings
 # ──────────────────────────────────────────────
 DEFAULTS = {
-    "default_llm": "kimi-k2.5",
+    "default_llm": "gpt-oss-120b",
     "default_image_model": "sd-3.5-large",
     "model_selection_mode": "auto",    # auto | thinking | fast | code
     "voice_enabled": False,
