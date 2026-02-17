@@ -77,7 +77,15 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     loop = asyncio.get_running_loop()
     response_text = await loop.run_in_executor(None, agent.chat, user_text, False)
 
-    # Split long messages if needed (Telegram limit is 4096 chars)
+    # Send response with image support
+    await send_response_with_images(update, context, response_text)
+
+
+async def send_response_with_images(update: Update, context: ContextTypes.DEFAULT_TYPE, response_text: str):
+    """Send text response and upload any detected images."""
+    chat_id = update.effective_chat.id
+
+    # Split long messages if needed
     if len(response_text) > 4000:
         for x in range(0, len(response_text), 4000):
             await update.message.reply_text(response_text[x:x+4000])
@@ -90,10 +98,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if image_matches:
         for image_path in image_matches:
-            # Clean path (sometimes it might have extra characters or be partial)
             image_path = image_path.strip()
-            
-            # Ensure it's a local file
             if os.path.exists(image_path):
                 try:
                     await context.bot.send_chat_action(chat_id=chat_id, action="upload_photo")
@@ -101,12 +106,10 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     logger.info(f"Sent image to Telegram: {image_path}")
                 except Exception as e:
                     logger.error(f"Failed to send image {image_path}: {e}")
-                    await update.message.reply_text(f"❌ Failed to upload image: {e}")
             else:
                 logger.warning(f"Image path not found: {image_path}")
 
 
-async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming voice messages."""
     if not agent:
@@ -122,7 +125,6 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
         # 1. Download voice file
         new_file = await context.bot.get_file(voice.file_id)
         
-        # Download to memory
         import io
         video_bio = io.BytesIO()
         await new_file.download_to_memory(video_bio)
@@ -147,16 +149,8 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
         # 3. Send to Agent
         response_text = await loop.run_in_executor(None, agent.chat, transcript, False)
 
-        # 4. Reply
-        if len(response_text) > 4000:
-            for x in range(0, len(response_text), 4000):
-                await update.message.reply_text(response_text[x:x+4000])
-        else:
-            await update.message.reply_text(response_text)
-
-        # Detect and upload images (reuse logic?)
-        # For simplicity, we won't clone the image logic here unless refactored, 
-        # but technically we should. Let's assume text reply for now.
+        # 4. Reply with images support
+        await send_response_with_images(update, context, response_text)
         
     except Exception as e:
         logger.error(f"Voice handling failed: {e}")
