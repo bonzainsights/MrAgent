@@ -198,6 +198,43 @@ def create_app() -> Flask:
             "default_model": ModelSelector.get_default_for_mode(mode),
         })
 
+    @app.route("/api/voice", methods=["POST"])
+    def voice():
+        """Handle voice audio upload and transcription."""
+        if "file" not in request.files:
+            return jsonify({"error": "No file part"}), 400
+        
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No selected file"}), 400
+
+        try:
+            # Read audio bytes
+            audio_bytes = file.read()
+            
+            # Transcribe
+            from providers.nvidia_stt import NvidiaSTTProvider
+            stt = NvidiaSTTProvider()
+            if not stt.available:
+                return jsonify({"error": "STT not available (check GROQ_API_KEY)"}), 503
+            
+            transcript = stt.speech_to_text(audio_bytes)
+            
+            # Chat with agent (blocking for now)
+            response = _agent.chat(transcript, stream=False)
+            _chat_store.save_message(_agent.chat_id, "user", transcript)
+            _chat_store.save_message(_agent.chat_id, "assistant", response)
+
+            return jsonify({
+                "transcript": transcript,
+                "response": response,
+                "chat_id": _agent.chat_id
+            })
+
+        except Exception as e:
+            logger.error(f"Voice error: {e}")
+            return jsonify({"error": str(e)}), 500
+
     logger.info("Flask web app created")
     return app
 
@@ -600,7 +637,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .input-hint {
     font-size: 0.68rem; color: var(--text-muted);
     margin-top: 6px; text-align: center;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
   }
+
+  /* ── MIC BUTTON ── */
+  .mic-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .mic-btn:hover { color: var(--text); border-color: var(--accent); background: var(--surface3); }
+  .mic-btn.recording {
+    background: rgba(248, 113, 113, 0.2);
+    border-color: var(--error);
+    color: var(--error);
+    animation: pulseMic 1.5s infinite;
+  }
+  @keyframes pulseMic { 0%{box-shadow:0 0 0 0 rgba(248,113,113,0.4);} 70%{box-shadow:0 0 0 10px rgba(248,113,113,0);} 100%{box-shadow:0 0 0 0 rgba(248,113,113,0);} }
 
   /* ── QUEUE BAR ── */
   .queue-bar {
@@ -837,6 +897,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="input-wrapper">
           <textarea id="input" placeholder="Type your message... (Shift+Enter for new line)"
                     rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="mic-btn" id="mic-btn" onclick="toggleRecording()" title="Hold to record">🎤</button>
           <button class="send-btn" id="sendBtn" onclick="handleSendClick()">➤</button>
         </div>
         <div class="input-hint">Enter to send · Shift+Enter for new line</div>
@@ -1317,6 +1378,87 @@ input.focus();
 loadModels();
 loadHistory();
 updateStats();
+
+// ── VOICE RECORDING ──
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+
+async function toggleRecording() {
+  const micBtn = document.getElementById('mic-btn');
+  
+  if (!isRecording) {
+    // Start Recording
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            await sendVoiceMessage(audioBlob);
+            
+            // Stop tracks to release mic
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        micBtn.classList.add('recording');
+        micBtn.innerHTML = '⏹'; // Stop icon
+    } catch (err) {
+        console.error("Mic access denied:", err);
+        alert("Could not access microphone.");
+    }
+  } else {
+    // Stop Recording
+    mediaRecorder.stop();
+    isRecording = false;
+    micBtn.classList.remove('recording');
+    micBtn.innerHTML = '🎤';
+  }
+}
+
+async function sendVoiceMessage(audioBlob) {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "voice.wav");
+
+    // UI Feedback
+    addMessage('user', "🎤 Voice message sent...");
+    
+    // Show typing
+    const assistantDiv = addMessage('assistant', '');
+    const contentEl = assistantDiv.querySelector('.content');
+    contentEl.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+
+    try {
+        const response = await fetch('/api/voice', { method: 'POST', body: formData });
+        const data = await response.json();
+        
+        if (data.error) {
+           contentEl.innerHTML = `<span style="color:var(--error)">⚠️ Error: ${escapeHtml(data.error)}</span>`;
+           return;
+        }
+        
+        // Update user message
+        const userMsgs = document.querySelectorAll('.message.user .content');
+        if (userMsgs.length > 0) {
+            userMsgs[userMsgs.length - 1].innerText = `🎤 ${data.transcript}`;
+        }
+
+        // Update assistant message
+        contentEl.innerHTML = formatContent(data.response);
+        hljs.highlightAll();
+        chat.scrollTop = chat.scrollHeight;
+        
+    } catch (err) {
+        contentEl.innerHTML = `<span style="color:var(--error)">⚠️ Network error: ${escapeHtml(err)}</span>`;
+    }
+}
 </script>
 </body>
 </html>"""
