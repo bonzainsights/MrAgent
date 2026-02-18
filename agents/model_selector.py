@@ -23,6 +23,7 @@ MODE_DEFAULTS = {
     "thinking": "gpt-oss-120b",
     "fast": "gemma-3n",
     "code": "qwen3-coder",
+    "browsing": "llama-3.3-70b",
     "general": "gpt-oss-120b",
 }
 
@@ -35,6 +36,10 @@ PATTERNS = {
         r"\b(git|commit|push|pull|merge|branch|deploy)\b",
         r"\b(pip|npm|install|package|dependency|import)\b",
     ],
+    "browsing": [
+        r"\b(search|find|look up|fetch|download|browse|web|news|headline|topic|trend)\b",
+        r"\b(url|link|site|page|website)\b",
+    ],
     "thinking": [
         r"\b(analyze|explain|compare|evaluate|reason|think|plan)\b",
         r"\b(design|architect|strategy|approach|tradeoff|pros and cons)\b",
@@ -43,7 +48,6 @@ PATTERNS = {
         r"\b(step[- ]?by[- ]?step|break down|decompose)\b",
         # Creative / tool-requiring tasks → need tool-capable model
         r"\b(image|picture|photo|draw|paint|illustrat|generat|creat)\b",
-        r"\b(search|find|look up|fetch|download|browse|web|news|headline|topic|trend)\b",
         r"\b(file|folder|directory|read|write|save|delete|move|rename)\b",
         r"\b(run|execute|terminal|command|shell|screenshot)\b",
     ],
