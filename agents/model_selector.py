@@ -104,7 +104,63 @@ class ModelSelector:
         return self._classify(message)
 
     def _classify(self, message: str) -> str:
-        """Classify a message and return the best model name."""
+        """Classify a message using LLM router (Gemma-3n) with regex fallback."""
+        
+        # 1. Try Smart LLM Classification first
+        try:
+            from openai import OpenAI
+            from config.settings import NVIDIA_KEYS, NVIDIA_BASE_URL
+            
+            api_key = NVIDIA_KEYS.get("llama_33_70b") or NVIDIA_KEYS.get("gpt_oss_120b")
+            if api_key:
+                client = OpenAI(base_url=NVIDIA_BASE_URL, api_key=api_key)
+                
+                # Concise classification prompt
+                # Note: We map output categories to our internal modes
+                # BROWSING -> browsing (Llama 70b)
+                # CODING -> code (Qwen)
+                # THINKING -> thinking (GPT 120b)
+                # FAST -> fast (Gemma)
+                prompt = (
+                    "Classify this user query into exactly one category:\n"
+                    "- BROWSING: for news, search, real-time info, weather, time, facts, web urls (e.g. 'what time is it', 'latest news')\n"
+                    "- CODING: for programming, debugging, scripts, data formats\n"
+                    "- THINKING: for complex reasoning, planning, analysis, creative writing\n"
+                    "- FAST: for simple greetings, chatter, quick translations, short questions (e.g. 'hi', 'thanks')\n\n"
+                    f"Query: \"{message}\"\n"
+                    "Category (return ONLY the word):"
+                )
+
+                response = client.chat.completions.create(
+                    model="meta/llama-3.3-70b-instruct",  # Use Llama 3.3 70B for smarter routing
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=10,
+                    temperature=0.0,
+                    timeout=3.0 # Slightly higher timeout for larger model
+                )
+                
+                category_raw = response.choices[0].message.content.strip().upper()
+                self.logger.debug(f"Smart Classifier output: {category_raw}")
+                
+                # Map Router output to modes
+                router_map = {
+                    "BROWSING": "browsing",
+                    "CODING": "code",
+                    "THINKING": "thinking",
+                    "FAST": "fast"
+                }
+
+                # Robust matching (e.g. if model says "Category: BROWSING")
+                for key, mode in router_map.items():
+                    if key in category_raw:
+                        model = MODE_DEFAULTS[mode]
+                        self.logger.info(f"Router decided: {key} → {model}")
+                        return model
+
+        except Exception as e:
+            self.logger.warning(f"Smart classification failed ({e}), falling back to pattern matching.")
+
+        # 2. Fallback to Regex (legacy logic)
         msg_lower = message.lower()
         # Initialize scores for all defined categories
         scores = {k: 0 for k in PATTERNS.keys()}
@@ -127,19 +183,7 @@ class ModelSelector:
             self.logger.debug(
                 f"Classified as '{best_category}' (scores: {scores}), model: {model}"
             )
-
-        # Safety: if model doesn't support tools but message likely needs tools,
-        # upgrade to a tool-capable model
-        model_info = MODEL_REGISTRY.get(model, {})
-        if not model_info.get("supports_tools", False):
-            needs_tools = bool(re.search(
-                r"\b(image|generat|draw|search|find|file|run|execute|screenshot|fetch|web)\b",
-                msg_lower
-            ))
-            if needs_tools:
-                model = MODE_DEFAULTS["thinking"]  # gpt-oss-120b supports tools
-                self.logger.info(f"Upgraded to tool-capable model: {model}")
-
+        
         return model
 
     def set_mode(self, mode: str):
