@@ -59,13 +59,47 @@ def get_stt():
     return _stt_provider
 
 
-def get_search():
-    """Get the Brave Search provider (singleton)."""
+def get_search(provider_name: str = None):
+    """
+    Get the search provider.
+    args:
+        provider_name: 'brave' or 'google'. If None, uses SEARCH_PROVIDER env var (default: brave).
+    """
+    import os
+    target = provider_name or os.getenv("SEARCH_PROVIDER", "brave")
+
+    if target == "google":
+        return _get_google_search()
+    elif target == "langsearch":
+        return _get_langsearch()
+    else:
+        return _get_brave_search()
+
+
+def _get_brave_search():
     global _search_provider
-    if _search_provider is None:
+    if _search_provider is None or _search_provider.name != "brave_search":
         from providers.brave_search import BraveSearchProvider
         _search_provider = BraveSearchProvider()
-        logger.info("Search provider ready")
+        logger.info("Brave Search provider ready")
+    return _search_provider
+
+
+def _get_google_search():
+    global _search_provider
+    if _search_provider is None or _search_provider.name != "google_search":
+        from providers.google_search import GoogleSearchProvider
+        _search_provider = GoogleSearchProvider()
+        logger.info("Google Search provider ready")
+    return _search_provider
+
+
+def _get_langsearch():
+    global _search_provider
+    if _search_provider is None or _search_provider.name != "langsearch":
+        from providers.langsearch import LangSearchProvider
+        _search_provider = LangSearchProvider()
+        logger.info("LangSearch provider ready")
     return _search_provider
 
 

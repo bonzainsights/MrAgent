@@ -123,13 +123,18 @@ class SearchWebTool(Tool):
                 "type": "integer",
                 "description": "Number of results (default: 5)",
             },
+            "provider": {
+                "type": "string",
+                "enum": ["brave", "google", "langsearch"],
+                "description": "Search provider to use (default: configured default)",
+            },
         },
         "required": ["query"],
     }
 
-    def execute(self, query: str, count: int = 5) -> str:
+    def execute(self, query: str, count: int = 5, provider: str = None) -> str:
         try:
             from providers import get_search
-            return get_search().search_formatted(query, count)
+            return get_search(provider).search_formatted(query, count)
         except Exception as e:
             return f"❌ Search error: {e}"

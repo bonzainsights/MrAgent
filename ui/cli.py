@@ -317,47 +317,105 @@ class CLIInterface:
         self._print_info("-----------------------")
         
         options = {
-            "1": ("Telegram Bot", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]),
-            "2": ("AgentMail", ["AGENTMAIL_API_KEY"]),
-            "3": ("Brave Search", ["BRAVE_SEARCH_API_KEY"]),
-            "4": ("NVIDIA API", ["NVIDIA_BASE_URL", "NVIDIA_KIMI_K2_5"]), # Just examples
+            "1": "Search Provider (Google/Brave)",
+            "2": "Telegram Bot",
+            "3": "AgentMail",
+            "4": "NVIDIA API",
         }
         
-        for key, (name, _) in options.items():
+        for key, name in options.items():
             print(f"  {key}. {name}")
         print("  0. Cancel")
         
         choice = self._get_input_clean("Select a skill to configure (0-4): ")
         
-        if choice == "0" or choice not in options:
+        if choice == "0":
             self._print_info("Configuration cancelled.")
             return
 
-        skill_name, env_vars = options[choice]
-        self._print_info(f"\nConfiguring {skill_name}...")
+        if choice == "1":
+            self._configure_search_provider()
+        elif choice == "2":
+            self._configure_generic_skill("Telegram Bot", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"])
+        elif choice == "3":
+            self._configure_generic_skill("AgentMail", ["AGENTMAIL_API_KEY"])
+        elif choice == "4":
+            self._configure_generic_skill("NVIDIA API", ["NVIDIA_BASE_URL", "NVIDIA_KIMI_K2_5"])
+        else:
+            self._print_info("Invalid choice.")
+
+    def _configure_search_provider(self):
+        """Specific configuration for search providers."""
+        self._print_info("\n🔍 Search Provider Configuration")
+        print("  1. Google Search (requires API Key + CSE ID)")
+        print("  2. Brave Search (requires API Key)")
+        print("  3. LangSearch (requires API Key)")
+        print("  0. Cancel")
         
+        choice = self._get_input_clean("Select provider (0-3): ")
+        
+        if choice == "1":
+            print("\nConfiguring Google Search...")
+            self._update_env_interactive("GOOGLE_SEARCH_API_KEY")
+            self._update_env_interactive("GOOGLE_SEARCH_CSE_ID")
+            
+            from utils.config_manager import update_env_key
+            if update_env_key("SEARCH_PROVIDER", "google"):
+                self._print_info("✅ Default search provider set to: Google")
+                
+        elif choice == "2":
+            print("\nConfiguring Brave Search...")
+            self._update_env_interactive("BRAVE_SEARCH_API_KEY")
+            
+            from utils.config_manager import update_env_key
+            if update_env_key("SEARCH_PROVIDER", "brave"):
+                self._print_info("✅ Default search provider set to: Brave")
+
+        elif choice == "3":
+            print("\nConfiguring LangSearch...")
+            self._update_env_interactive("LANGSEARCH_API_KEY")
+            
+            from utils.config_manager import update_env_key
+            if update_env_key("SEARCH_PROVIDER", "langsearch"):
+                self._print_info("✅ Default search provider set to: LangSearch")
+                
+        elif choice == "0":
+            self._print_info("Cancelled.")
+        else:
+            self._print_info("Invalid choice.")
+
+    def _configure_generic_skill(self, name: str, env_vars: list):
+        """Configure a generic skill with a list of env vars."""
+        self._print_info(f"\nConfiguring {name}...")
         changes_made = False
-        from utils.config_manager import update_env_key
         
         for var in env_vars:
-            current_val = os.getenv(var, "")
-            display_val = f"{current_val[:4]}...{current_val[-4:]}" if current_val and len(current_val) > 8 else (current_val or "Not set")
-            
-            print(f"\n{var}")
-            print(f"Current: {display_val}")
-            new_val = self._get_input_clean(f"Enter new value (Press Enter to keep): ")
-            
-            if new_val:
-                if update_env_key(var, new_val):
-                    print(f"✅ Updated {var}")
-                    changes_made = True
-                else:
-                    print(f"❌ Failed to update {var}")
+            if self._update_env_interactive(var):
+                changes_made = True
         
         if changes_made:
             self._print_info("\n✅ Configuration updated! Please restart MRAgent for changes to take effect.")
         else:
             self._print_info("\nNo changes made.")
+
+    def _update_env_interactive(self, key: str) -> bool:
+        """Interactive helper to update a single env var."""
+        current_val = os.getenv(key, "")
+        display_val = f"{current_val[:4]}...{current_val[-4:]}" if current_val and len(current_val) > 8 else (current_val or "Not set")
+        
+        print(f"\n{key}")
+        print(f"Current: {display_val}")
+        new_val = self._get_input_clean(f"Enter new value (Press Enter to keep): ")
+        
+        if new_val:
+            from utils.config_manager import update_env_key
+            if update_env_key(key, new_val):
+                print(f"✅ Updated {key}")
+                return True
+            else:
+                print(f"❌ Failed to update {key}")
+                return False
+        return False
 
     def _get_input_clean(self, prompt: str) -> str:
         """Helper to get raw input without rich formatting issues."""
