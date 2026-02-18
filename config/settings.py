@@ -88,7 +88,7 @@ MODEL_REGISTRY = {
         "key": "kimi_k2_5",
         "type": "llm",
         "categories": ["thinking", "fast", "code"],
-        "context_window": 131_072,
+        "context_window": 32_000,      # Capped for speed (native 131k)
         "supports_tools": True,
         "description": "All-rounder: reasoning, coding & fast replies",
     },

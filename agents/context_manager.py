@@ -12,11 +12,12 @@ logger = get_logger("agents.context_manager")
 
 # Default context windows per model
 CONTEXT_WINDOWS = {
-    "kimi-k2.5": 131_072,
+    "kimi-k2.5": 32_000,      # Capped for speed (native is 131k)
     "glm5": 128_000,
     "gemma-3n": 32_000,
     "qwen3-coder": 262_144,
     "llama-3.3-70b": 128_000,
+    "gpt-oss-120b": 128_000,  # Explicitly defined
 }
 
 DEFAULT_CONTEXT_WINDOW = 32_000
