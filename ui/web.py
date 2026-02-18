@@ -198,6 +198,12 @@ def create_app() -> Flask:
             "default_model": ModelSelector.get_default_for_mode(mode),
         })
 
+    @app.route("/api/voices", methods=["GET"])
+    def get_voices():
+        """Get available TTS voices."""
+        from providers.tts import VOICES, DEFAULT_VOICE
+        return jsonify({"voices": VOICES, "default": DEFAULT_VOICE})
+
     @app.route("/api/voice", methods=["POST"])
     def voice():
         """Handle voice audio upload and transcription."""
@@ -205,6 +211,8 @@ def create_app() -> Flask:
             return jsonify({"error": "No file part"}), 400
         
         file = request.files["file"]
+        voice_id = request.form.get("voice", None) # Get selected voice
+        
         if file.filename == "":
             return jsonify({"error": "No selected file"}), 400
 
@@ -228,20 +236,19 @@ def create_app() -> Flask:
             # Generate TTS
             audio_base64 = None
             try:
+                import os
                 import tempfile
                 import base64
-                from providers.tts import text_to_speech
+                from providers.tts import text_to_speech, DEFAULT_VOICE
+                
+                target_voice = voice_id if voice_id else DEFAULT_VOICE
                 
                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
                     tts_path = tmp.name
                 
                 # We need to run async function in sync Flask route. 
-                # Since we are already in a thread (Flask threaded=True), we can use asyncio.run
-                # But that might conflict with existing loops.
-                # A safer way is to use the existing loop if available or create new one.
-                # However, Flask requests don't have a loop by default.
                 import asyncio
-                asyncio.run(text_to_speech(response[:1000], tts_path)) # Limit to 1000 chars for web speed
+                asyncio.run(text_to_speech(response[:1000], tts_path, voice=target_voice))
                 
                 if os.path.exists(tts_path):
                     with open(tts_path, "rb") as audio_f:
@@ -254,7 +261,8 @@ def create_app() -> Flask:
                 "transcript": transcript,
                 "response": response,
                 "audio": audio_base64,
-                "chat_id": _agent.chat_id
+                "chat_id": _agent.chat_id,
+                "voice_used": target_voice
             })
 
         except Exception as e:
@@ -962,6 +970,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <select class="setting-select" id="modelSelect" onchange="setModel(this.value)">
         </select>
       </div>
+
+      <h3 style="margin-top:20px">Voice</h3>
+      <div class="setting-group">
+        <label class="setting-label">TTS Voice</label>
+        <select class="setting-select" id="voiceSelect">
+             <option value="">Loading...</option>
+        </select>
+      </div>
     </div>
 
     <div class="settings-section">
@@ -1404,6 +1420,27 @@ input.focus();
 loadModels();
 loadHistory();
 updateStats();
+loadVoices();
+
+// ── Voice Options ──
+async function loadVoices() {
+    try {
+        const resp = await fetch('/api/voices');
+        const data = await resp.json();
+        const select = document.getElementById('voiceSelect');
+        select.innerHTML = '';
+        
+        data.voices.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            // Make friendly names
+            let name = v.split('-')[2].replace('Neural', '');
+            opt.textContent = name;
+            if (v === data.default) opt.selected = true;
+            select.appendChild(opt);
+        });
+    } catch(e) { console.error("Failed to load voices", e); }
+}
 
 // ── VOICE RECORDING ──
 let mediaRecorder;
@@ -1452,6 +1489,12 @@ async function toggleRecording() {
 async function sendVoiceMessage(audioBlob) {
     const formData = new FormData();
     formData.append("file", audioBlob, "voice.wav");
+    
+    // Attach selected voice
+    const voiceSelect = document.getElementById('voiceSelect');
+    if (voiceSelect && voiceSelect.value) {
+        formData.append("voice", voiceSelect.value);
+    }
 
     // UI Feedback
     addMessage('user', "🎤 Voice message sent...");
@@ -1470,6 +1513,7 @@ async function sendVoiceMessage(audioBlob) {
            return;
         }
         
+        const userMsgs = document.querySelectorAll('.message.user .content');
         if (userMsgs.length > 0) {
             userMsgs[userMsgs.length - 1].innerText = `🎤 ${data.transcript}`;
         }

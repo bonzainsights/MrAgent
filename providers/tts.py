@@ -10,11 +10,20 @@ from utils.logger import get_logger
 
 logger = get_logger("providers.tts")
 
-# Voice options:
-# en-US-AriaNeural (Female, Default)
-# en-US-GuyNeural (Male)
-# en-GB-SoniaNeural (Female, British)
-DEFAULT_VOICE = "en-US-AriaNeural"
+# Friendly Neural Voices
+# en-US-EmmaNeural: Friendly, warm
+# en-US-AnaNeural: Child/Teen, very natural
+# en-US-AriaNeural: Professional, clear
+# en-GB-SoniaNeural: British, professional
+VOICES = [
+    "en-US-EmmaNeural",
+    "en-US-AnaNeural",
+    "en-US-AriaNeural", 
+    "en-GB-SoniaNeural"
+]
+
+# Set a warmer default
+DEFAULT_VOICE = "en-US-EmmaNeural"
 
 async def text_to_speech(text: str, output_file: str, voice: str = DEFAULT_VOICE) -> str:
     """
