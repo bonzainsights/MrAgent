@@ -4,6 +4,8 @@ setup(
     name="mragent",
     version="0.1.0",
     description="A lightweight, open-source AI Agent powered by free APIs",
+    long_description=open("README.md", encoding="utf-8").read(),
+    long_description_content_type="text/markdown",
     author="Bonza Insights",
     author_email="hello@bonzainsights.com",
     url="https://github.com/bonzainsights/MRAgent",

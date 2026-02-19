@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+include requirements.txt
+include .env.example
+recursive-include data *
+recursive-include config *
+recursive-include skills *
+recursive-include core *
+recursive-include agents *
+recursive-include providers *
+recursive-include tools *
+recursive-include ui *
+recursive-include utils *
