@@ -26,6 +26,7 @@ from utils.logger import get_logger
 from config.settings import (
     DEFAULTS, validate_config, save_config_backup, SYSTEM_INFO
 )
+from agents.vivrecard import VivreCard
 
 logger = get_logger("main")
 
@@ -143,6 +144,11 @@ def print_startup_info(args: argparse.Namespace):
     # Save config snapshot at startup
     backup_path = save_config_backup()
     logger.debug(f"Config backup saved: {backup_path}")
+
+    # Start VivreCard Scheduler
+    vivrecard = VivreCard()
+    vivrecard.start()
+    logger.info("VivreCard Scheduler started in background")
 
 
 def run_cli(args: argparse.Namespace):

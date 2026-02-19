@@ -30,3 +30,7 @@ python-telegram-bot>=20.0  # Telegram bot interface
 
 # ── TTS (Edge) ──
 edge-tts>=7.0.0            # Cloud-based Text-to-Speech (free, high quality)
+
+# ── Scheduler (VivreCard) ──
+croniter>=3.0.0            # Cron expression parsing for VivreCard scheduler
+schedule>=1.2.0            # Job scheduling for VivreCard
