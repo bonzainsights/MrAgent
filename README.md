@@ -99,14 +99,30 @@ MRAgent/
 
 ### Installation
 
+#### **Mac/Linux**
+
+```bash
+./install.sh
+mragent
+```
+
+#### **Windows**
+
+```powershell
+.\install.bat
+mragent
+```
+
+#### **Manual Setup (Advanced)**
+
 ```bash
 # Clone the repository
-git clone git@github.com:bonzainsights/MRAgent.git
+git clone https://github.com/bonzainsights/MrAgent.git
 cd MRAgent
 
 # Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
