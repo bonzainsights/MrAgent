@@ -1,6 +1,13 @@
 <p align="center">
   <h1 align="center">🤖 MRAgent</h1>
   <p align="center">
+    <a href="https://pypi.org/project/mragent/">
+      <img src="https://img.shields.io/pypi/v/mragent.svg?style=flat-square" alt="PyPI version" />
+    </a>
+    <a href="https://github.com/bonzainsights/MrAgent/releases">
+      <img src="https://img.shields.io/github/v/release/bonzainsights/MrAgent?style=flat-square" alt="GitHub release" />
+    </a>
+    <br/>
     <strong>A lightweight, open-source AI Agent powered by free APIs</strong>
   </p>
   <p align="center">
