@@ -82,47 +82,70 @@ class NvidiaLLMProvider(LLMProvider):
             If stream=False: {"content": str, "tool_calls": list, "usage": dict}
             If stream=True: Generator yielding {"delta": str} or {"tool_calls": list}
         """
-        friendly_name, model_id = self._resolve_model(model)
-        client = self._get_client(friendly_name)
+        # Define the parameter step-down chain
+        fallback_chain = [
+            "gpt-oss-120b",
+            "llama-3.3-70b",
+            "glm5",
+            "kimi-k2.5",
+            "qwen3-coder",
+            "gemma-3n"
+        ]
 
-        self.logger.debug(f"Chat request: model={model_id}, messages={len(messages)}, stream={stream}")
+        models_to_try = []
+        if model in fallback_chain:
+            start_idx = fallback_chain.index(model)
+            models_to_try = fallback_chain[start_idx:]
+        else:
+            models_to_try = [model] + fallback_chain
 
-        start_time = time.time()
+        last_exception = None
 
-        def _make_request():
-            kwargs = {
-                "model": model_id,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "stream": stream,
-            }
+        for current_model in models_to_try:
+            try:
+                friendly_name, model_id = self._resolve_model(current_model)
+                client = self._get_client(friendly_name)
 
-            # Only send tools if the model supports function calling
-            model_info = MODEL_REGISTRY.get(friendly_name, {})
-            if tools and model_info.get("supports_tools", True):
-                kwargs["tools"] = tools
-                kwargs["tool_choice"] = "auto"
-            elif tools and not model_info.get("supports_tools", True):
-                self.logger.debug(
-                    f"Skipping tools for {friendly_name} — model does not support function calling"
-                )
+                self.logger.debug(f"Chat request trying: model={model_id} (param size step-down)")
 
-            return client.chat.completions.create(**kwargs)
+                start_time = time.time()
 
-        try:
-            response = self._retry_call(_make_request)
-            duration_ms = (time.time() - start_time) * 1000
+                def _make_request():
+                    kwargs = {
+                        "model": model_id,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "stream": stream,
+                    }
 
-            if stream:
-                return self._handle_stream(response, friendly_name, model_id, duration_ms)
-            else:
-                return self._handle_response(response, friendly_name, model_id, duration_ms)
+                    model_info = MODEL_REGISTRY.get(friendly_name, {})
+                    if tools and model_info.get("supports_tools", True):
+                        kwargs["tools"] = tools
+                        kwargs["tool_choice"] = "auto"
+                    elif tools and not model_info.get("supports_tools", True):
+                        self.logger.debug(f"Skipping tools for {friendly_name} — unsupported")
 
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            self._track_call("chat/completions", model_id, duration_ms, status=f"error: {e}")
-            raise
+                    return client.chat.completions.create(**kwargs)
+
+                response = self._retry_call(_make_request)
+                duration_ms = (time.time() - start_time) * 1000
+
+                if stream:
+                    return self._handle_stream(response, friendly_name, model_id, duration_ms)
+                else:
+                    return self._handle_response(response, friendly_name, model_id, duration_ms)
+
+            except Exception as e:
+                self.logger.warning(f"Model {current_model} failed ({e}). Stepping down to next fallback model...")
+                last_exception = e
+                # Fall through and let loop try the next model in the chain
+                continue
+
+        # If exhausted all
+        duration_ms = (time.time() - start_time) * 1000 if 'start_time' in locals() else 0
+        self._track_call("chat/completions", model, duration_ms, status=f"error: exhausted fallbacks")
+        raise last_exception
 
     def _handle_response(self, response, friendly_name: str,
                          model_id: str, duration_ms: float) -> dict:

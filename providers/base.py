@@ -91,6 +91,11 @@ class BaseProvider(ABC):
                 return func()
             except Exception as e:
                 last_exception = e
+                # Fail fast on unrecoverable authentication or routing errors
+                if hasattr(e, "status_code") and getattr(e, "status_code") in (401, 403, 404):
+                    self.logger.error(f"Unrecoverable API error {getattr(e, 'status_code')}: {e}. Skipping retries.")
+                    raise e
+                    
                 self.logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
                 if attempt < max_retries - 1:
                     delay = min(base_delay * (2 ** attempt), 30.0)
