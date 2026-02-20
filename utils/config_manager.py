@@ -7,15 +7,19 @@ import os
 from pathlib import Path
 
 from utils.logger import get_logger
+from config.settings import _APP_DATA_DIR
 
 logger = get_logger("utils.config")
 
-def update_env_key(key: str, value: str, env_path: str = ".env") -> bool:
+def update_env_key(key: str, value: str, env_path: str = None) -> bool:
     """
     Update or add a key-value pair in the .env file.
     Preserves existing comments and structure.
     """
-    path = Path(env_path)
+    if env_path is None:
+        path = _APP_DATA_DIR / ".env"
+    else:
+        path = Path(env_path)
     
     if not path.exists():
         # Create new if doesn't exist

@@ -268,7 +268,7 @@ def run_watch(args: argparse.Namespace):
 
 def run_install_wizard():
     """Interactive wizard to guide new users to set up API keys."""
-    from config.settings import validate_config, _PROJECT_ROOT
+    from config.settings import validate_config, _APP_DATA_DIR
     from config import settings
     
     report = validate_config()
@@ -292,7 +292,7 @@ def run_install_wizard():
             break
             
         if len(key) > 20: 
-            env_path = _PROJECT_ROOT / ".env"
+            env_path = _APP_DATA_DIR / ".env"
             
             updates = [
                 f"\n# Auto-configured by Startup Wizard",
@@ -324,12 +324,12 @@ def run_install_wizard():
 
 def run_identity_wizard():
     """Interactive wizard to configure User and Agent names on first boot."""
-    from config.settings import _PROJECT_ROOT
+    from config.settings import _APP_DATA_DIR
     from config import settings
     import os
     
     # Check if USER_NAME is already in .env
-    env_path = _PROJECT_ROOT / ".env"
+    env_path = _APP_DATA_DIR / ".env"
     if env_path.exists():
         with open(env_path, "r", encoding="utf-8") as f:
             if "USER_NAME=" in f.read():

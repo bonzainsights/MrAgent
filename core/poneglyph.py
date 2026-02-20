@@ -20,7 +20,7 @@ import traceback
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-from config.settings import DATA_DIR
+from config.settings import DATA_DIR, _APP_DATA_DIR
 
 logger = logging.getLogger("core.poneglyph")
 
@@ -83,7 +83,7 @@ class Poneglyph:
     def _check_environment(self) -> bool:
         """Verify environment variables."""
         # Check for .env file
-        env_path = Path(".env")
+        env_path = _APP_DATA_DIR / ".env"
         if not env_path.exists():
             self.issues.append({
                 "type": "config",
@@ -233,8 +233,9 @@ class Poneglyph:
             elif action == "create_env_template":
                  print("🛠️  Creating .env from example...")
                  try:
+                     env_path = _APP_DATA_DIR / ".env"
                      if Path(".env.example").exists():
-                         Path(".env").write_text(Path(".env.example").read_text())
+                         env_path.write_text(Path(".env.example").read_text())
                          print("✅ .env created. Please edit it with your keys.")
                      else:
                          print("❌ .env.example missing.")

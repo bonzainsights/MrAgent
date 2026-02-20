@@ -17,13 +17,26 @@ from dotenv import load_dotenv
 # Load .env
 # ──────────────────────────────────────────────
 _PROJECT_ROOT = Path(__file__).parent.parent
-load_dotenv(_PROJECT_ROOT / ".env")
+
+# Detect if we're running from source or installed via pip
+_IS_DEV = (_PROJECT_ROOT / ".git").exists() or (_PROJECT_ROOT / ".env.example").exists()
+
+if _IS_DEV:
+    # Local dev mode
+    _APP_DATA_DIR = _PROJECT_ROOT
+else:
+    # Installed via pip -> store data in user's home directory
+    _APP_DATA_DIR = Path.home() / ".mragent"
+    _APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Load environment variables
+load_dotenv(_APP_DATA_DIR / ".env")
 
 
 # ──────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────
-DATA_DIR = _PROJECT_ROOT / "data"
+DATA_DIR = _APP_DATA_DIR / "data"
 LOGS_DIR = DATA_DIR / "logs"
 IMAGES_DIR = DATA_DIR / "images"
 CONFIG_BACKUP_DIR = DATA_DIR / "config_backups"
