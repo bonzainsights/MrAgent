@@ -429,6 +429,7 @@ class CLIInterface:
             {"id": "telegram", "label": "Telegram Bot       [dim](@BotFather)[/dim]"},
             {"id": "agentmail", "label": "AgentMail          [dim](Email via API)[/dim]"},
             {"id": "nvidia", "label": "NVIDIA API         [dim](Primary LLM key)[/dim]"},
+            {"id": "groq", "label": "Groq API           [dim](Whisper Voice STT)[/dim]"},
             {"id": "cancel", "label": "[dim]Cancel...[/dim]"}
         ]
         
@@ -441,11 +442,13 @@ class CLIInterface:
         if choice == "search":
             self._configure_search_provider()
         elif choice == "telegram":
-            self._configure_generic_skill("Telegram Bot", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"])
+            self._configure_generic_skill("Telegram Bot", ["TELEGRAM_BOT_TOKEN", "ALLOWED_TELEGRAM_CHATS"])
         elif choice == "agentmail":
             self._configure_generic_skill("AgentMail", ["AGENTMAIL_API_KEY"])
         elif choice == "nvidia":
-            self._configure_generic_skill("NVIDIA API", ["NVIDIA_BASE_URL", "NVIDIA_API_KEY"])
+            self._configure_generic_skill("NVIDIA API", ["NVIDIA_API_KEY"])
+        elif choice == "groq":
+            self._configure_generic_skill("Groq API", ["GROQ_API_KEY"])
 
     def _configure_search_provider(self):
         """Specific configuration for search providers."""
@@ -527,6 +530,13 @@ class CLIInterface:
             return input(prompt).strip()
         except EOFError:
             return ""
+        except UnicodeDecodeError:
+            import sys
+            import termios
+            # Flush the invalid bytes from stdin buffer to prevent immediate re-read
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
+            print("\n[!] Invalid UTF-8 characters detected. Avoid copy-pasting from formatted documents. Use plain text only.")
+            return self._get_input_clean(prompt)
 
     def _capture_screen(self):
         """Capture and analyze the screen."""

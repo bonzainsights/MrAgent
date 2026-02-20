@@ -31,7 +31,7 @@ class TelegramTool(Tool):
         return key
 
     def _get_chat_id(self) -> str:
-        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+        chat_id = os.getenv("ALLOWED_TELEGRAM_CHATS")
         # Optional: tool args can override this, but env var is default target
         return chat_id
 
@@ -74,7 +74,7 @@ class TelegramSendTool(TelegramTool):
     def execute(self, message: str, chat_id: str = None) -> str:
         target_chat_id = chat_id or self._get_chat_id()
         if not target_chat_id:
-            return "❌ Error: No chat_id provided and TELEGRAM_CHAT_ID not set in .env"
+            return "❌ Error: No chat_id provided and ALLOWED_TELEGRAM_CHATS not set in .env"
 
         payload = {
             "chat_id": target_chat_id,

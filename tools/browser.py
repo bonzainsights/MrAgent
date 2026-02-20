@@ -123,11 +123,6 @@ class SearchWebTool(Tool):
                 "type": "integer",
                 "description": "Number of results (default: 5)",
             },
-            "provider": {
-                "type": "string",
-                "enum": ["brave", "google", "langsearch"],
-                "description": "Search provider to use (default: configured default)",
-            },
         },
         "required": ["query"],
     }
