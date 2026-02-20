@@ -221,81 +221,25 @@ class CLIInterface:
                     self._print_info(f"Available: {', '.join(k for k,v in MODEL_REGISTRY.items() if v.get('type') in ('llm', 'vlm'))}")
             else:
                 # Interactive set (Inline)
-                try:
-                    from prompt_toolkit.application import Application
-                    from prompt_toolkit.key_binding import KeyBindings
-                    from prompt_toolkit.layout.containers import Window
-                    from prompt_toolkit.layout.controls import FormattedTextControl
-                    from prompt_toolkit.layout.layout import Layout
-                    from prompt_toolkit.formatted_text import HTML, merge_formatted_text
+                choices = []
+                for model_id, info in MODEL_REGISTRY.items():
+                    if info.get("type") in ("llm", "vlm"):
+                        cats = ", ".join(info.get("categories", []))
+                        label = f"{model_id:<20} [dim]({cats})[/dim]"
+                        choices.append({"id": model_id, "label": label})
+                
+                if not choices:
+                    self._print_info("No LLM models found.")
+                    return True
 
-                    # Build choices
-                    choices = []
-                    for model_id, info in MODEL_REGISTRY.items():
-                        if info.get("type") in ("llm", "vlm"):
-                            cats = ", ".join(info.get("categories", []))
-                            label = f"{model_id:<20} [dim]({cats})[/dim]"
-                            choices.append({"id": model_id, "label": label})
-                    
-                    if not choices:
-                        self._print_info("No LLM models found.")
-                        return True
-
-                    # Selection State
-                    state = {"index": 0, "selected": None}
-
-                    # 1. Key Bindings
-                    kb = KeyBindings()
-
-                    @kb.add("up")
-                    def _(event):
-                        state["index"] = (state["index"] - 1) % len(choices)
-
-                    @kb.add("down")
-                    def _(event):
-                        state["index"] = (state["index"] + 1) % len(choices)
-
-                    @kb.add("enter")
-                    def _(event):
-                        state["selected"] = choices[state["index"]]["id"]
-                        event.app.exit(result=state["selected"])
-
-                    @kb.add("c-c")
-                    def _(event):
-                        event.app.exit(result=None)
-
-                    # 2. Layout (Render function)
-                    def get_formatted_text():
-                        lines = []
-                        lines.append(HTML("<b>Select a model (Type /help for more info):</b>"))
-                        for i, choice in enumerate(choices):
-                            if i == state["index"]:
-                                lines.append(HTML(f"\n <style fg='cyan'>❯ {choice['label']}</style>"))
-                            else:
-                                lines.append(HTML(f"\n   {choice['label']}"))
-                        return merge_formatted_text(lines)
-
-                    # 3. Application
-                    app = Application(
-                        layout=Layout(Window(content=FormattedTextControl(get_formatted_text), height=len(choices)+2)),
-                        key_bindings=kb,
-                        mouse_support=False,
-                        full_screen=False,
-                    )
-
-                    selected_model = app.run()
-                    
-                    if selected_model:
-                        self.agent.set_model(selected_model)
-                        self._last_model = selected_model
-                        self._print_info(f"✅ Model set to: {selected_model}")
-                    else:
-                        self._print_info("Cancelled.")
-
-                except ImportError:
-                    self._print_info("Interactive selection requires prompt_toolkit.")
-                except Exception as e:
-                    self._print_info(f"Selection failed: {e}")
+                selected_model = self._interactive_menu("Select a model (Type /help for more info):", choices)
+                
+                if selected_model:
+                    self.agent.set_model(selected_model)
+                    self._last_model = selected_model
+                    self._print_info(f"✅ Model set to: {selected_model}")
+                else:
+                    self._print_info("Cancelled.")
 
         elif command == "/mode":
             if arg in ("auto", "thinking", "fast", "code", "browsing"):
@@ -306,20 +250,27 @@ class CLIInterface:
             else:
                 from agents.model_selector import ModelSelector
                 current = self.agent.model_selector.mode
-                self._print_info(f"Current mode: {current}")
-                self._print_info("")
-                self._print_info(f"Current mode: {current}")
-                self._print_info("")
-                for m in ("thinking", "fast", "code", "browsing"):
-                    default = ModelSelector.get_default_for_mode(m)
-                    options = ModelSelector.get_models_for_mode(m)
-                    others = [o for o in options if o != default]
-                    line = f"  {m:10s} → {default} (default)"
-                    if others:
-                        line += f"  | also: {', '.join(others)}"
-                    self._print_info(line)
-                self._print_info(f"  {'auto':10s} → picks best model per message")
-                self._print_info("\nUsage: mode <name>  (e.g. mode fast)")
+                
+                # Build dynamic menu choices for mode selection
+                choices = []
+                for m in ("auto", "thinking", "fast", "code", "browsing"):
+                    if m == "auto":
+                        label = "auto       [dim](Dynamic fallback routing)[/dim]"
+                    else:
+                        default = ModelSelector.get_default_for_mode(m)
+                        extra = f" [dim]({default})[/dim]"
+                        label = f"{m:<10} {extra}"
+                    choices.append({"id": m, "label": label})
+                
+                selected_mode = self._interactive_menu(f"Select a Mode (Current: {current}):", choices)
+                
+                if selected_mode:
+                    self.agent.set_model_mode(selected_mode)
+                    self.agent.model_override = None
+                    self._last_model = self._mode_to_model(selected_mode)
+                    self._print_info(f"✅ Switched to {selected_mode} mode → {self._last_model}")
+                else:
+                    self._print_info("Cancelled.")
 
         elif command == "/voice":
             self.voice_enabled = not self.voice_enabled
@@ -385,6 +336,68 @@ class CLIInterface:
     # Action helpers
     # ──────────────────────────────────────────────
 
+    def _interactive_menu(self, title: str, choices: list[dict]) -> str:
+        """
+        Display an interactive arrow-key menu.
+        choices should contain dicts with 'id' and 'label'.
+        """
+        try:
+            from prompt_toolkit.application import Application
+            from prompt_toolkit.key_binding import KeyBindings
+            from prompt_toolkit.layout.containers import Window
+            from prompt_toolkit.layout.controls import FormattedTextControl
+            from prompt_toolkit.layout.layout import Layout
+            from prompt_toolkit.formatted_text import HTML, merge_formatted_text
+
+            if not choices:
+                return None
+
+            state = {"index": 0, "selected": None}
+            kb = KeyBindings()
+
+            @kb.add("up")
+            def _(event):
+                state["index"] = (state["index"] - 1) % len(choices)
+
+            @kb.add("down")
+            def _(event):
+                state["index"] = (state["index"] + 1) % len(choices)
+
+            @kb.add("enter")
+            def _(event):
+                state["selected"] = choices[state["index"]]["id"]
+                event.app.exit(result=state["selected"])
+
+            @kb.add("c-c")
+            def _(event):
+                event.app.exit(result=None)
+
+            def get_formatted_text():
+                lines = []
+                lines.append(HTML(f"<b>{title}</b>"))
+                for i, choice in enumerate(choices):
+                    if i == state["index"]:
+                        lines.append(HTML(f"\n <style fg='cyan'>❯ {choice['label']}</style>"))
+                    else:
+                        lines.append(HTML(f"\n   {choice['label']}"))
+                return merge_formatted_text(lines)
+
+            app = Application(
+                layout=Layout(Window(content=FormattedTextControl(get_formatted_text), height=len(choices)+2)),
+                key_bindings=kb,
+                mouse_support=False,
+                full_screen=False,
+            )
+
+            return app.run()
+
+        except ImportError:
+            self._print_info("Interactive selection requires prompt_toolkit.")
+            return None
+        except Exception as e:
+            self._print_info(f"Selection failed: {e}")
+            return None
+
     def _generate_image(self, prompt: str, model: str = "flux-dev"):
         """Generate an image via the agent."""
         self._print_info(f"🎨 Generating image with {model}: {prompt}")
@@ -410,47 +423,44 @@ class CLIInterface:
     def _configure_skills(self):
         """Interactive skills configuration."""
         self._print_info("\n🧩 Skills Configuration")
-        self._print_info("-----------------------")
         
-        options = {
-            "1": "Search Provider (Google/Brave)",
-            "2": "Telegram Bot",
-            "3": "AgentMail",
-            "4": "NVIDIA API",
-        }
+        choices = [
+            {"id": "search", "label": "Search Provider    [dim](Google/Brave)[/dim]"},
+            {"id": "telegram", "label": "Telegram Bot       [dim](@BotFather)[/dim]"},
+            {"id": "agentmail", "label": "AgentMail          [dim](Email via API)[/dim]"},
+            {"id": "nvidia", "label": "NVIDIA API         [dim](Primary LLM key)[/dim]"},
+            {"id": "cancel", "label": "[dim]Cancel...[/dim]"}
+        ]
         
-        for key, name in options.items():
-            print(f"  {key}. {name}")
-        print("  0. Cancel")
+        choice = self._interactive_menu("Select a skill to configure:", choices)
         
-        choice = self._get_input_clean("Select a skill to configure (0-4): ")
-        
-        if choice == "0":
+        if choice == "cancel" or not choice:
             self._print_info("Configuration cancelled.")
             return
 
-        if choice == "1":
+        if choice == "search":
             self._configure_search_provider()
-        elif choice == "2":
+        elif choice == "telegram":
             self._configure_generic_skill("Telegram Bot", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"])
-        elif choice == "3":
+        elif choice == "agentmail":
             self._configure_generic_skill("AgentMail", ["AGENTMAIL_API_KEY"])
-        elif choice == "4":
-            self._configure_generic_skill("NVIDIA API", ["NVIDIA_BASE_URL", "NVIDIA_KIMI_K2_5"])
-        else:
-            self._print_info("Invalid choice.")
+        elif choice == "nvidia":
+            self._configure_generic_skill("NVIDIA API", ["NVIDIA_BASE_URL", "NVIDIA_API_KEY"])
 
     def _configure_search_provider(self):
         """Specific configuration for search providers."""
         self._print_info("\n🔍 Search Provider Configuration")
-        print("  1. Google Search (requires API Key + CSE ID)")
-        print("  2. Brave Search (requires API Key)")
-        print("  3. LangSearch (requires API Key)")
-        print("  0. Cancel")
         
-        choice = self._get_input_clean("Select provider (0-3): ")
+        choices = [
+            {"id": "google", "label": "Google Search      [dim](requires API Key + CSE ID)[/dim]"},
+            {"id": "brave", "label": "Brave Search       [dim](requires API Key)[/dim]"},
+            {"id": "langsearch", "label": "LangSearch         [dim](requires API Key)[/dim]"},
+            {"id": "cancel", "label": "[dim]Cancel...[/dim]"}
+        ]
         
-        if choice == "1":
+        choice = self._interactive_menu("Select provider:", choices)
+        
+        if choice == "google":
             print("\nConfiguring Google Search...")
             self._update_env_interactive("GOOGLE_SEARCH_API_KEY")
             self._update_env_interactive("GOOGLE_SEARCH_CSE_ID")
@@ -459,7 +469,7 @@ class CLIInterface:
             if update_env_key("SEARCH_PROVIDER", "google"):
                 self._print_info("✅ Default search provider set to: Google")
                 
-        elif choice == "2":
+        elif choice == "brave":
             print("\nConfiguring Brave Search...")
             self._update_env_interactive("BRAVE_SEARCH_API_KEY")
             
@@ -467,7 +477,7 @@ class CLIInterface:
             if update_env_key("SEARCH_PROVIDER", "brave"):
                 self._print_info("✅ Default search provider set to: Brave")
 
-        elif choice == "3":
+        elif choice == "langsearch":
             print("\nConfiguring LangSearch...")
             self._update_env_interactive("LANGSEARCH_API_KEY")
             
@@ -475,10 +485,8 @@ class CLIInterface:
             if update_env_key("SEARCH_PROVIDER", "langsearch"):
                 self._print_info("✅ Default search provider set to: LangSearch")
                 
-        elif choice == "0":
-            self._print_info("Cancelled.")
         else:
-            self._print_info("Invalid choice.")
+            self._print_info("Cancelled.")
 
     def _configure_generic_skill(self, name: str, env_vars: list):
         """Configure a generic skill with a list of env vars."""
