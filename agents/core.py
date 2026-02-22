@@ -8,6 +8,9 @@ Created: 2026-02-15
 import threading
 import json
 import time
+import re
+import base64
+from pathlib import Path
 from typing import Callable, Generator
 
 from agents.context_manager import ContextManager
@@ -88,9 +91,49 @@ class AgentCore:
         """Internal chat logic (not thread-safe)."""
         turn_start = time.time()
 
-        # 1. Enhance & add user message
+        # 1. Enhance & format user message (parse images if present)
         enhanced = self.prompt_enhancer.enhance_user_message(user_message)
-        self.context_manager.add_message({"role": "user", "content": enhanced})
+        
+        # Parse for [Attached Image: /path/to/image]
+        image_matches = re.findall(r'\[Attached Image: (.*?)\]', enhanced)
+        if image_matches:
+            # Multi-modal array
+            content_array = []
+            
+            # Remove the tags from the text part to avoid confusing the LLM with duplicate info
+            text_only = re.sub(r'\[Attached Image: .*?\]', '', enhanced).strip()
+            if text_only:
+                content_array.append({"type": "text", "text": text_only})
+                
+            for img_path_str in image_matches:
+                img_path = Path(img_path_str.strip())
+                if img_path.exists():
+                    try:
+                        with open(img_path, "rb") as bf:
+                            encoded_img = base64.b64encode(bf.read()).decode('utf-8')
+                            
+                        # Determine MIME type roughly
+                        ext = img_path.suffix.lower()
+                        mime_type = "image/jpeg"
+                        if ext == ".png": mime_type = "image/png"
+                        elif ext == ".webp": mime_type = "image/webp"
+                        
+                        content_array.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{encoded_img}"
+                            }
+                        })
+                    except Exception as e:
+                        logger.error(f"Failed to read attached image {img_path}: {e}")
+            
+            if not content_array:
+                # Fallback to string if parsing failed
+                content_array = enhanced
+            
+            self.context_manager.add_message({"role": "user", "content": content_array})
+        else:
+            self.context_manager.add_message({"role": "user", "content": enhanced})
 
         # 2. Select model
         model = self.model_selector.select(user_message, override=self.model_override)

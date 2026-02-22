@@ -174,6 +174,63 @@ def create_app() -> Flask:
     def stats():
         return jsonify(_agent.get_stats())
 
+    @app.route("/api/upload", methods=["POST"])
+    @require_auth
+    def upload_files():
+        """Handle multiple file uploads from Web UI."""
+        if 'files' not in request.files:
+            return jsonify({"error": "No files provided"}), 400
+        
+        uploaded_files = request.files.getlist('files')
+        results = []
+        
+        # Ensure uploads directory exists
+        uploads_dir = DATA_DIR / "uploads"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        
+        for file in uploaded_files:
+            if file.filename == '':
+                continue
+                
+            file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+            
+            # Text based files
+            if file_ext in ['txt', 'json', 'xml', 'csv', 'md', 'py', 'js', 'html', 'css', 'jsonl', 'yaml', 'yml']:
+                content = file.read().decode('utf-8', errors='replace')
+                results.append(f"[Attached File: {file.filename}]\n```\n{content}\n```")
+            
+            # PDF files
+            elif file_ext == 'pdf':
+                try:
+                    import PyPDF2
+                    pdf_reader = PyPDF2.PdfReader(file)
+                    text = ""
+                    for page in pdf_reader.pages:
+                        text += page.extract_text() + "\n"
+                    results.append(f"[Attached Document: {file.filename}]\n```\n{text}\n```")
+                except Exception as e:
+                    results.append(f"[Failed to parse PDF {file.filename}: {e}]")
+                    logger.error(f"PDF Parsing error on {file.filename}: {e}")
+            
+            # Image files
+            elif file_ext in ['png', 'jpg', 'jpeg', 'webp']:
+                # Save locally for the agent to access via absolute path
+                file_path = uploads_dir / file.filename
+                # Handle filename collisions
+                counter = 1
+                while file_path.exists():
+                    name, ext = file.filename.rsplit('.', 1) if '.' in file.filename else (file.filename, '')
+                    file_path = uploads_dir / f"{name}_{counter}.{ext}"
+                    counter += 1
+                    
+                file.save(str(file_path))
+                results.append(f"[Attached Image: {file_path.absolute()}]")
+                
+            else:
+                results.append(f"[Unsupported file attached: {file.filename}]")
+                
+        return jsonify({"status": "ok", "results": results})
+
     @app.route("/api/newchat", methods=["POST"])
     @require_auth
     def newchat():
@@ -1011,7 +1068,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <textarea id="input" placeholder="Type your message... (Shift+Enter for new line)"
                     rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
           <label class="mic-btn" for="file-upload" title="Attach file" style="cursor: pointer; display: flex; align-items: center; justify-content: center;">📎</label>
-          <input type="file" id="file-upload" style="display: none;" onchange="handleFileUpload(event)" accept=".txt,.json,.xml,.csv,.md,.py,.js,.html,.css,.jsonl,.yaml,.yml">
+          <input type="file" id="file-upload" style="display: none;" onchange="handleFileUpload(event)" accept=".txt,.json,.xml,.csv,.md,.py,.js,.html,.css,.jsonl,.yaml,.yml,.pdf,.png,.jpg,.jpeg,.webp" multiple>
           <button class="mic-btn" id="mic-btn" onclick="toggleRecording()" title="Hold to record">🎤</button>
           <button class="send-btn" id="sendBtn" onclick="handleSendClick()">➤</button>
         </div>
@@ -1295,17 +1352,50 @@ const queueItems = document.getElementById('queueItems');
 
 // ── File Upload ──
 async function handleFileUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const contents = e.target.result;
-    const currentVal = input.value;
-    input.value = currentVal + (currentVal ? '\n\n' : '') + `[Attached File: ${file.name}]\n\`\`\`\n${contents}\n\`\`\`\n`;
-    autoResize(input);
-  };
-  reader.readAsText(file);
-  event.target.value = '';
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const formData = new FormData();
+  for (let i = 0; i < files.length; i++) {
+    formData.append("files", files[i]);
+  }
+
+  // Show a temporary uploading message
+  const uploadingPill = document.createElement('div');
+  uploadingPill.className = 'queue-pill';
+  uploadingPill.innerHTML = `<span class="pill-text">⏳ Uploading ${files.length} file(s)...</span>`;
+  queueBar.classList.add('visible');
+  queueItems.appendChild(uploadingPill);
+
+  try {
+    const resp = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.results && data.results.length > 0) {
+        let currentVal = input.value;
+        data.results.forEach(res => {
+            currentVal = currentVal + (currentVal ? '\n\n' : '') + res;
+        });
+        input.value = currentVal;
+        autoResize(input);
+      }
+      if (data.error) {
+        alert("Upload error: " + data.error);
+      }
+    } else {
+      alert("Upload failed: " + resp.statusText);
+    }
+  } catch (err) {
+    alert("Upload error: " + err.message);
+  } finally {
+    uploadingPill.remove();
+    renderQueue();
+    event.target.value = ''; // clear input
+  }
 }
 
 // ── Handle send/stop button click ──

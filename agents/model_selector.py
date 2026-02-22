@@ -25,6 +25,7 @@ MODE_DEFAULTS = {
     "code": "qwen3-coder",
     "browsing": "llama-3.3-70b",
     "general": "llama-3.3-70b",
+    "image": "llama-3.2-11b-vision"
 }
 
 # Keyword patterns for auto-classification
@@ -104,8 +105,15 @@ class ModelSelector:
         return self._classify(message)
 
     def _classify(self, message: str) -> str:
-        """Classify a message using LLM router (Gemma-3n) with regex fallback."""
+        """Classifies the task into a logic category and returns the best model."""
+        message_lower = message.lower()
         
+        # Immediate override for vision tasks
+        image_matches = re.findall(r'\[Attached Image: (.*?)\]', message)
+        if image_matches:
+            self.logger.info(f"Classified as 'image' internally due to Attached Image tag")
+            return self.get_default_for_mode("image")
+
         # 1. Try Smart LLM Classification first
         try:
             from openai import OpenAI
