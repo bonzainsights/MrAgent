@@ -1,10 +1,10 @@
 """
 MRAgent — Google AI Studio Image Generation Provider
-Uses Gemini's generate_images API (gemini-2.5-flash-image) via google-genai SDK.
-Free tier: 100 images/day — falls back to NVIDIA FLUX when exhausted.
+Uses Gemini's generate_content API with gemini-2.5-flash-image model.
+Free tier: ~100 images/day — falls back to NVIDIA FLUX when exhausted.
 
 Created: 2026-02-23
-Updated: 2026-02-23 — Use generate_images() API per Google docs
+Updated: 2026-02-23 — Use generate_content() with gemini-2.5-flash-image
 """
 
 import time
@@ -19,17 +19,14 @@ from utils.helpers import get_timestamp_short
 
 logger = get_logger("providers.google_image")
 
-# Default model for image generation
+# Correct model for free-tier image generation via generate_content
 GOOGLE_IMAGE_MODEL = "gemini-2.5-flash-image"
-
-# Valid aspect ratios
-VALID_ASPECT_RATIOS = {"1:1", "4:3", "3:4", "16:9", "9:16"}
 
 
 class GoogleImageProvider(ImageProvider):
     """
-    Google AI Studio image generation via Gemini generate_images API.
-    Uses the free-tier google-genai SDK (100 images/day).
+    Google AI Studio image generation via Gemini generate_content API.
+    Uses the free-tier google-genai SDK.
     """
 
     def __init__(self):
@@ -38,7 +35,7 @@ class GoogleImageProvider(ImageProvider):
         self.api_key = os.getenv("GOOGLE_AI_STUDIO_KEY", "")
         self._available = bool(self.api_key)
         if self._available:
-            self.logger.info("Google Image provider initialized (Gemini generate_images)")
+            self.logger.info("Google Image provider initialized (gemini-2.5-flash-image)")
         else:
             self.logger.debug("Google Image provider not available (GOOGLE_AI_STUDIO_KEY not set)")
 
@@ -49,12 +46,12 @@ class GoogleImageProvider(ImageProvider):
     def generate_image(self, prompt: str, model: str = None,
                        aspect_ratio: str = "1:1", **kwargs) -> dict:
         """
-        Generate an image using Gemini's generate_images API.
+        Generate an image using Gemini's generate_content API.
 
         Args:
             prompt: Text description of the image to generate.
-            model: Ignored for Google — always uses gemini-2.5-flash-image.
-            aspect_ratio: Image aspect ratio (1:1, 4:3, 3:4, 16:9, 9:16).
+            model: Ignored — always uses gemini-2.5-flash-image.
+            aspect_ratio: Hint added to prompt (1:1, 4:3, 3:4, 16:9, 9:16).
 
         Returns:
             {"base64": str, "filepath": Path, "model": str, "prompt": str}
@@ -64,39 +61,46 @@ class GoogleImageProvider(ImageProvider):
 
         try:
             from google import genai
-            from google.genai import types
         except ImportError:
             raise ImportError("google-genai not installed. Install with: pip install google-genai")
 
-        # Always use Google's own model
         target_model = GOOGLE_IMAGE_MODEL
 
-        # Validate aspect ratio
-        if aspect_ratio not in VALID_ASPECT_RATIOS:
-            aspect_ratio = "1:1"
+        # Add aspect ratio hint to prompt if not square
+        enhanced_prompt = prompt
+        if aspect_ratio and aspect_ratio != "1:1":
+            ratio_hints = {
+                "16:9": "widescreen landscape format",
+                "9:16": "tall portrait format",
+                "4:3": "standard landscape format",
+                "3:4": "standard portrait format",
+            }
+            hint = ratio_hints.get(aspect_ratio, "")
+            if hint:
+                enhanced_prompt = f"{prompt}, {hint}"
 
-        self.logger.info(f"Generating image via Google: model={target_model}, "
-                         f"aspect={aspect_ratio}, prompt='{prompt[:60]}...'")
+        self.logger.info(f"Generating image via Google: model={target_model}, prompt='{prompt[:60]}...'")
         start_time = time.time()
 
         try:
             client = genai.Client(api_key=self.api_key)
 
-            response = client.models.generate_images(
+            # Use generate_content — this is the correct API for gemini-2.5-flash-image
+            response = client.models.generate_content(
                 model=target_model,
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio=aspect_ratio,
-                    safety_filter_level="block_some",
-                ),
+                contents=[enhanced_prompt],
             )
 
-            # Extract image from response
-            if not response.generated_images:
-                raise ValueError("No image returned from Google API (may be quota or safety filter)")
+            # Extract image from response parts
+            image_bytes = None
+            for part in response.candidates[0].content.parts:
+                if part.inline_data is not None:
+                    image_bytes = part.inline_data.data
+                    break
 
-            image_bytes = response.generated_images[0].image.image_bytes
+            if not image_bytes:
+                raise ValueError("No image returned from Google API (may be safety filter or quota)")
+
             b64_image = base64.b64encode(image_bytes).decode("utf-8")
 
             # Save to disk
