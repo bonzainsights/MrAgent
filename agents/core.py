@@ -243,6 +243,9 @@ class AgentCore:
 
     def _execute_tool_calls(self, tool_calls: list, assistant_response: dict):
         """Execute tool calls and add results to conversation context."""
+        from config.settings import AUTONOMY_SETTINGS
+        import fnmatch
+
         # Normalize tool_calls: ensure each has "type": "function" (required by NVIDIA API)
         normalized_tool_calls = []
         for tc in tool_calls:
@@ -261,6 +264,8 @@ class AgentCore:
         }
         self.context_manager.add_message(assistant_msg)
 
+        trust_level = AUTONOMY_SETTINGS.get("trust_level", "balanced")
+
         for tc in tool_calls:
             func_name = tc.get("function", {}).get("name", "")
             func_args_str = tc.get("function", {}).get("arguments", "{}")
@@ -275,10 +280,21 @@ class AgentCore:
 
             self._emit("tool_start", f"🔧 Running: {func_name}({json.dumps(func_args)[:100]})")
 
-            # Execute the tool with Human-in-the-Loop check
+            # Execute the tool with tiered approval logic
             result = None
-            
-            # Helper to check if a terminal command is safe for auto-execution
+
+            # Helper: check if a command matches auto-approve patterns
+            def matches_auto_approve(cmd: str) -> bool:
+                """Check if command matches any auto-approve pattern from settings."""
+                if not cmd:
+                    return False
+                patterns = AUTONOMY_SETTINGS.get("auto_approve_patterns", [])
+                for pattern in patterns:
+                    if fnmatch.fnmatch(cmd.strip(), pattern):
+                        return True
+                return False
+
+            # Helper: check if a terminal command is safe (read-only)
             def is_safe_command(cmd: str) -> bool:
                 if not cmd:
                     return False
@@ -287,41 +303,70 @@ class AgentCore:
                 for p in unsafe_patterns:
                     if p in cmd:
                         return False
-                        
+
                 # Extract base command
                 base_cmd = cmd.strip().split()[0] if cmd.strip() else ""
-                
+
                 # Whitelisted safe read-only commands
                 safe_cmds = {
                     'ls', 'pwd', 'echo', 'cat', 'git status', 'git log', 'git diff',
                     'grep', 'find', 'which', 'whoami', 'date', 'tree', 'head', 'tail', 'less'
                 }
-                
+
                 # Check for two-word safe commands like git status
                 if len(cmd.split()) >= 2:
                     two_word_cmd = " ".join(cmd.split()[:2])
                     if two_word_cmd in safe_cmds:
                         return True
-                        
+
                 return base_cmd in safe_cmds
 
+            # ── Tiered Approval Logic ──
             if func_name == "execute_terminal":
                 cmd_to_run = func_args.get("command", "")
-                if not is_safe_command(cmd_to_run):
+
+                if trust_level == "autonomous":
+                    # Autonomous: run everything, just log it
+                    logger.info(f"[AUTONOMOUS] Auto-running: {cmd_to_run}")
+                    self._emit("info", f"⚡ [autonomous] Running: {cmd_to_run[:80]}")
+
+                elif trust_level == "balanced":
+                    # Balanced: auto-run if safe OR matches patterns; otherwise ask
+                    if not is_safe_command(cmd_to_run) and not matches_auto_approve(cmd_to_run):
+                        if self.approval_callback:
+                            tool_desc = f"⚠️ Agent wants to run a command:\n```bash\n{cmd_to_run}\n```"
+                            self._emit("approval_required", tool_desc)
+                            # Send async Telegram notification
+                            self._notify_pending_approval(func_name, cmd_to_run)
+                            approved = self.approval_callback(tool_desc)
+                            if not approved:
+                                result = "❌ Execution rejected by user."
+                        else:
+                            logger.info(f"[BALANCED] Auto-approved (no callback): {cmd_to_run}")
+                    else:
+                        logger.info(f"[BALANCED] Pattern-approved: {cmd_to_run}")
+
+                else:  # cautious
+                    if not is_safe_command(cmd_to_run):
+                        if self.approval_callback:
+                            tool_desc = f"⚠️ Agent wants to run an unsafe command:\n```bash\n{cmd_to_run}\n```"
+                            self._emit("approval_required", tool_desc)
+                            approved = self.approval_callback(tool_desc)
+                            if not approved:
+                                result = "❌ Execution rejected by user."
+
+            elif func_name == "run_code":
+                if trust_level == "autonomous":
+                    logger.info(f"[AUTONOMOUS] Auto-running code snippet")
+                    self._emit("info", "⚡ [autonomous] Running code...")
+                elif trust_level == "cautious":
                     if self.approval_callback:
-                        tool_desc = f"⚠️ Agent wants to run an unsafe command:\n```bash\n{cmd_to_run}\n```"
+                        tool_desc = f"⚠️ Agent wants to run code:\n```python\n{func_args.get('code', '')[:200]}...\n```"
                         self._emit("approval_required", tool_desc)
                         approved = self.approval_callback(tool_desc)
                         if not approved:
                             result = "❌ Execution rejected by user."
-            
-            elif func_name == "run_code":
-                if self.approval_callback:
-                    tool_desc = f"⚠️ Agent wants to run code:\n```python\n{func_args.get('code', '')[:200]}...\n```"
-                    self._emit("approval_required", tool_desc)
-                    approved = self.approval_callback(tool_desc)
-                    if not approved:
-                        result = "❌ Execution rejected by user."
+                # balanced: auto-approve code execution (it's sandboxed)
 
             if result is None:
                 result = self.tool_registry.execute(func_name, **func_args)
@@ -336,7 +381,38 @@ class AgentCore:
             }
             self.context_manager.add_message(tool_msg)
 
-        logger.info(f"Executed {len(tool_calls)} tool call(s)")
+        logger.info(f"Executed {len(tool_calls)} tool call(s) [trust={trust_level}]")
+
+    def _notify_pending_approval(self, tool_name: str, command: str):
+        """Send a Telegram notification when an approval is pending (balanced mode)."""
+        from config.settings import AUTONOMY_SETTINGS, TELEGRAM_BOT_TOKEN
+        if not AUTONOMY_SETTINGS.get("notify_on_pending", False) or not TELEGRAM_BOT_TOKEN:
+            return
+
+        try:
+            import threading
+            def _send():
+                try:
+                    from skills.telegram import TelegramSkill
+                    skill = TelegramSkill()
+                    allowed_chats = skill.allowed_chats
+                    if not allowed_chats:
+                        return
+                    msg = (
+                        f"⚠️ *MRAgent Approval Pending*\n\n"
+                        f"Tool: `{tool_name}`\n"
+                        f"Command: `{command[:200]}`\n\n"
+                        f"Waiting for your approval in the terminal..."
+                    )
+                    for chat_id in allowed_chats:
+                        skill._send_message(chat_id, msg)
+                except Exception as e:
+                    logger.debug(f"Telegram notification failed: {e}")
+
+            # Fire-and-forget in a thread to not block the approval prompt
+            threading.Thread(target=_send, daemon=True).start()
+        except Exception:
+            pass
 
     # ──────────────────────────────────────────────
     # User-facing commands

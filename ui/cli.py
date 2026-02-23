@@ -31,6 +31,7 @@ COMMANDS = {
     "/skills":   "Configure API skills (Telegram, AgentMail...)",
     "/email":    "Send an email interactively",
     "/identity": "Change your name or the agent's name",
+    "/autonomy": "Set trust level (cautious/balanced/autonomous)",
     "/watch":    "Start Eagle Eye Watcher mode",
     "/exit":     "Exit MRAgent",
 }
@@ -331,6 +332,9 @@ class CLIInterface:
             except Exception as e:
                 self._print_info(f"❌ Watcher error: {e}")
 
+        elif command == "/autonomy":
+            self._configure_autonomy()
+
         else:
             self._print_info(f"Unknown command: {command}. Type /help for commands.")
 
@@ -489,6 +493,33 @@ class CLIInterface:
         else:
             self._print_info("\nNo changes made.")
 
+    def _configure_autonomy(self):
+        """Interactive autonomy/trust level configuration."""
+        from config.settings import AUTONOMY_SETTINGS
+        from utils.config_manager import update_env_key
+
+        current = AUTONOMY_SETTINGS.get("trust_level", "balanced")
+        self._print_info(f"\n⚡ Autonomy Configuration (current: {current})")
+
+        choices = [
+            {"id": "cautious",   "label": "🔒 cautious    [dim](Ask before every non-read command)[/dim]"},
+            {"id": "balanced",   "label": "⚖️  balanced    [dim](Auto-run safe patterns, ask for risky)[/dim]"},
+            {"id": "autonomous", "label": "⚡ autonomous  [dim](Run everything, log only — for 24/7)[/dim]"},
+            {"id": "cancel",     "label": "[dim]Cancel...[/dim]"},
+        ]
+
+        choice = self._interactive_menu(f"Select trust level (current: {current}):", choices)
+
+        if choice and choice != "cancel":
+            AUTONOMY_SETTINGS["trust_level"] = choice
+            update_env_key("TRUST_LEVEL", choice)
+            trust_icons = {'cautious': '🔒', 'balanced': '⚖️', 'autonomous': '⚡'}
+            self._print_info(f"\n✅ Trust level set to: {trust_icons.get(choice, '')} {choice}")
+            if choice == "autonomous":
+                self._print_info("⚠️  The agent will now execute ALL commands without asking. Use with caution.")
+        else:
+            self._print_info("Cancelled.")
+
     def _configure_search_provider(self):
         """Specific configuration for search providers."""
         self._print_info("\n🔍 Search Provider Configuration")
@@ -610,6 +641,12 @@ class CLIInterface:
         print(f"  Context:    {ctx['used_tokens']:,}/{ctx['max_tokens']:,} tokens ({ctx['usage_ratio']})")
         print(f"  Messages:   {ctx['active_messages']} active, {ctx['full_history_messages']} total")
         print(f"  DB:         {store_stats['chats']} chats, {store_stats['messages']} messages ({store_stats['db_size_kb']:.1f}KB)")
+
+        # Show autonomy trust level
+        from config.settings import AUTONOMY_SETTINGS
+        trust = AUTONOMY_SETTINGS.get('trust_level', 'balanced')
+        trust_icons = {'cautious': '🔒', 'balanced': '⚖️', 'autonomous': '⚡'}
+        print(f"  Trust:      {trust_icons.get(trust, '❓')} {trust}")
 
     # ──────────────────────────────────────────────
     # Display helpers

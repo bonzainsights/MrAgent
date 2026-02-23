@@ -89,6 +89,56 @@ AGENT_NAME = os.getenv("AGENT_NAME", "MRAgent")
 
 
 # ──────────────────────────────────────────────
+# Autonomy Settings (24/7 Operation)
+# ──────────────────────────────────────────────
+# Trust levels control how much the agent can do without asking:
+#   "cautious"   — Ask for approval on EVERY non-read-only command (default)
+#   "balanced"   — Auto-run safe patterns, ask for risky ones, notify via Telegram
+#   "autonomous" — Auto-run everything, log all actions (for unattended 24/7 use)
+AUTONOMY_SETTINGS = {
+    "trust_level": os.getenv("TRUST_LEVEL", "balanced"),
+
+    # Commands matching these glob-like patterns are auto-approved in balanced mode
+    # Each pattern is checked against the full command string
+    "auto_approve_patterns": [
+        "git *",
+        "python *.py",
+        "python -c *",
+        "pip install *",
+        "pip list*",
+        "npm *",
+        "node *",
+        "mkdir *",
+        "touch *",
+        "cp *",
+        "mv *",
+        "cat *",
+        "head *",
+        "tail *",
+        "wc *",
+        "sort *",
+        "grep *",
+        "find *",
+        "ls *",
+        "pwd",
+        "echo *",
+        "which *",
+        "whoami",
+        "date",
+        "tree *",
+        "curl *",    # For API testing — can be removed if too risky
+        "brew *",
+    ],
+
+    # Notify via Telegram when an approval is pending (balanced mode)
+    "notify_on_pending": os.getenv("NOTIFY_ON_PENDING", "true").lower() == "true",
+
+    # Auto-reject pending approvals after this many minutes (0 = wait forever)
+    "queue_timeout_minutes": int(os.getenv("QUEUE_TIMEOUT_MINUTES", "30")),
+}
+
+
+# ──────────────────────────────────────────────
 # Model Registry
 # ──────────────────────────────────────────────
 # Each model has:
