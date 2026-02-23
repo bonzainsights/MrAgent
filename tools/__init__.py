@@ -47,6 +47,10 @@ def create_tool_registry() -> ToolRegistry:
     registry.register(FetchWebPageTool())
     registry.register(SearchWebTool())
 
+    # PDF Reader
+    from tools.pdf_reader import ReadPDFTool
+    registry.register(ReadPDFTool())
+
     # Image generation
     from tools.image_gen import GenerateImageTool
     registry.register(GenerateImageTool())

@@ -33,6 +33,7 @@ You have access to the following tools:
 8. **capture_screen** — Take a screenshot of the user's screen
 9. **fetch_webpage** — Fetch and extract text from a web page
 10. **search_web** — Search the internet via Brave Search
+11. **read_pdf** — Read PDF documents with page-by-page text extraction
 
 You can also:
 - Generate images via /image command
