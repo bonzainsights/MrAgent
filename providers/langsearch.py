@@ -10,6 +10,7 @@ import requests
 
 from providers.base import SearchProvider
 from config.settings import LANGSEARCH_API_KEY
+from utils.sanitizer import sanitize_search_snippet
 from utils.logger import get_logger
 
 logger = get_logger("providers.langsearch")
@@ -79,7 +80,7 @@ class LangSearchProvider(SearchProvider):
                 results.append({
                     "title": item.get("name", ""),
                     "url": item.get("url", ""),
-                    "description": item.get("snippet", ""),
+                    "description": sanitize_search_snippet(item.get("snippet", ""), item.get("url", "")),
                     "age": item.get("datePublished", ""),
                 })
 

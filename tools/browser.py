@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from tools.base import Tool
 from utils.helpers import truncate
+from utils.sanitizer import sanitize_external_data
 from utils.logger import get_logger
 
 logger = get_logger("tools.browser")
@@ -101,7 +102,10 @@ class FetchWebPageTool(Tool):
 
         self.logger.info(f"Fetched {url}: {len(content)} chars ({duration_ms:.0f}ms)")
 
-        return f"🌐 {title}\nURL: {url}\n\n{content}"
+        # Sanitize external content against prompt injection
+        safe_content = sanitize_external_data(content, source_label=f"webpage: {parsed.netloc}")
+
+        return f"🌐 {title}\nURL: {url}\n\n{safe_content}"
 
 
 class SearchWebTool(Tool):
@@ -130,6 +134,8 @@ class SearchWebTool(Tool):
     def execute(self, query: str, count: int = 5, provider: str = None) -> str:
         try:
             from providers import get_search
-            return get_search(provider).search_formatted(query, count)
+            raw_results = get_search(provider).search_formatted(query, count)
+            # Sanitize search results against prompt injection
+            return sanitize_external_data(raw_results, source_label="web search")
         except Exception as e:
             return f"❌ Search error: {e}"

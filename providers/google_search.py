@@ -10,6 +10,7 @@ import requests
 
 from providers.base import SearchProvider
 from config.settings import GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_CSE_ID
+from utils.sanitizer import sanitize_search_snippet
 from utils.logger import get_logger
 
 logger = get_logger("providers.google_search")
@@ -77,7 +78,7 @@ class GoogleSearchProvider(SearchProvider):
                 results.append({
                     "title": item.get("title", ""),
                     "url": item.get("link", ""),
-                    "description": item.get("snippet", ""),
+                    "description": sanitize_search_snippet(item.get("snippet", ""), item.get("link", "")),
                     # Google API doesn't always provide date/age in a standard field easily,
                     # mostly hidden in pagemap or snippet. We leave it empty for now.
                     "age": "",

@@ -10,6 +10,7 @@ import requests
 
 from providers.base import SearchProvider
 from config.settings import BRAVE_SEARCH_API_KEY
+from utils.sanitizer import sanitize_search_snippet
 from utils.logger import get_logger
 
 logger = get_logger("providers.brave_search")
@@ -79,7 +80,7 @@ class BraveSearchProvider(SearchProvider):
                 results.append({
                     "title": item.get("title", ""),
                     "url": item.get("url", ""),
-                    "description": item.get("description", ""),
+                    "description": sanitize_search_snippet(item.get("description", ""), item.get("url", "")),
                     "age": item.get("age", ""),
                 })
 
