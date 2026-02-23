@@ -1,6 +1,6 @@
 # 🏗️ MRAgent — Detailed Architecture Plan
 
-> **Version:** 0.1.0 | **Created:** 2026-02-15 | **Status:** Planning  
+> **Version:** 0.1.0 | **Created:** 2026-02-15 | **Last Updated:** 2026-02-23 | **Status:** Active  
 > **Goal:** Build a lightweight Jarvis-like AI agent that runs on low-end hardware using free NVIDIA NIM APIs.
 
 ---
@@ -50,11 +50,11 @@
 │  │  │  NVIDIA ImageGen│ │  │  │ Code Run │ │ Screen Cap │  │   │
 │  │  │  (REST API)     │ │  │  └──────────┘ └────────────┘  │   │
 │  │  ├─────────────────┤ │  │  ┌──────────┐ ┌────────────┐  │   │
-│  │  │  NVIDIA TTS     │ │  │  │ Browser  │ │ Brave Srch │  │   │
+│  │  │  NVIDIA TTS     │ │  │  │ Browser  │ │ Web Search │  │   │
 │  │  │  (Riva gRPC)    │ │  │  └──────────┘ └────────────┘  │   │
-│  │  ├─────────────────┤ │  └────────────────────────────────┘   │
-│  │  │  NVIDIA STT     │ │                                       │
-│  │  │  (Riva gRPC)    │ │                                       │
+│  │  ├─────────────────┤ │  │  ┌──────────┐ ┌────────────┐  │   │
+│  │  │  NVIDIA STT     │ │  │  │ PDF Read │ │ Image Gen  │  │   │
+│  │  │  (Riva gRPC)    │ │  │  └──────────┘ └────────────┘  │   │
 │  │  └─────────────────┘ │                                       │
 │  └──────────────────────┘                                       │
 │                 ▼                                               │
@@ -387,77 +387,67 @@ The swarm works through Kimi's **native multi-step tool calling** — no separat
 
 ```
 MRAgent/
-├── main.py                    # Entry point
+├── main.py                    # Entry point & startup
 ├── requirements.txt           # Dependencies
 ├── .env                       # API keys (gitignored)
 ├── .env.example               # Template
-├── .gitignore
 ├── README.md
 │
 ├── config/
-│   ├── __init__.py
-│   └── settings.py            # Config loader, model registry
+│   └── settings.py            # Config, model registry, autonomy settings
 │
 ├── providers/
-│   ├── __init__.py
 │   ├── base.py                # Abstract provider interface
 │   ├── nvidia_llm.py          # NVIDIA LLM (OpenAI SDK)
 │   ├── nvidia_image.py        # NVIDIA Image Gen (REST)
-│   ├── nvidia_tts.py          # NVIDIA TTS (Riva gRPC)
-│   ├── nvidia_stt.py          # NVIDIA STT (Riva gRPC)
-│   └── brave_search.py        # Brave Search API
+│   ├── tts.py                 # Edge TTS
+│   ├── nvidia_stt.py          # Groq STT
+│   ├── brave_search.py        # Brave Search API
+│   ├── google_search.py       # Google Custom Search API
+│   └── langsearch.py          # LangSearch API
 │
 ├── agents/
-│   ├── __init__.py
-│   ├── core.py                # Main agent loop
+│   ├── core.py                # Main agent loop + tiered approval
 │   ├── prompt_enhancer.py     # Prompt rewriting & context injection
 │   ├── context_manager.py     # Token counting & sliding window
-│   └── model_selector.py      # Auto model selection
+│   ├── model_selector.py      # Auto model selection
+│   └── watcher.py             # Eagle Eye screen monitor
 │
 ├── tools/
-│   ├── __init__.py
 │   ├── base.py                # Base tool interface + OpenAI schema
 │   ├── terminal.py            # Shell command execution
 │   ├── file_manager.py        # File operations
 │   ├── code_runner.py         # Code execution sandbox
-│   ├── screen.py              # Screen capture
-│   └── browser.py             # Web browsing
+│   ├── screen.py              # Screen capture & diff
+│   ├── browser.py             # Web fetch & search (with sanitizer)
+│   ├── pdf_reader.py          # PDF text extraction
+│   └── image_gen.py           # Image generation tool
+│
+├── skills/
+│   ├── agentmail.py           # Email skill
+│   └── telegram.py            # Telegram skill
 │
 ├── memory/
-│   ├── __init__.py
-│   ├── chat_store.py          # SQLite chat storage
-│   └── config_backup.py       # Config snapshot & rollback
-│
-├── voice/
-│   ├── __init__.py
-│   └── pipeline.py            # Mic → STT → Agent → TTS → Speaker
+│   └── chat_store.py          # SQLite chat storage
 │
 ├── ui/
-│   ├── __init__.py
-│   ├── cli.py                 # Rich terminal interface
+│   ├── cli.py                 # Rich CLI (commands, menus, autonomy)
 │   ├── web.py                 # Flask browser interface
-│   ├── telegram_bot.py        # Telegram bot
-│   └── static/                # Web UI assets (HTML/CSS/JS)
-│       ├── index.html
-│       ├── style.css
-│       └── app.js
+│   └── telegram_bot.py        # Telegram bot
 │
 ├── utils/
-│   ├── __init__.py
+│   ├── sanitizer.py           # Prompt injection defense
 │   ├── logger.py              # Logging system
 │   └── helpers.py             # Shared utilities
+│
+├── core/
+│   └── poneglyph.py           # System Guardian & Doctor
 │
 ├── data/                      # Runtime data (gitignored)
 │   ├── chats.db
 │   ├── config_backups/
 │   ├── images/
 │   └── logs/
-│
-├── tests/
-│   ├── test_providers.py
-│   ├── test_tools.py
-│   ├── test_agent.py
-│   └── test_memory.py
 │
 └── docs/
     └── ARCHITECTURE.md        # This file
@@ -525,6 +515,60 @@ class RateLimiter:
 | **Phase 10** | Testing & polish                                     | ~3 hours         |
 
 **Total: ~29 hours of focused implementation**
+
+---
+
+## 11. Security & Autonomy Architecture
+
+### 11.1 Prompt Injection Defense (2-Layer)
+
+```
+External Data (web pages, search results, PDFs)
+    │
+    ▼
+┌─ LAYER 1: Sanitizer (utils/sanitizer.py) ────┐
+│  1. strip_dangerous_patterns()                 │
+│     - Regex detection of injection patterns    │
+│     - Removes: "ignore instructions",          │
+│       "share API keys", embedded bash/python   │
+│  2. sanitize_external_data()                   │
+│     - Wraps in structural markers:             │
+│     ═══ [UNTRUSTED EXTERNAL DATA] ═══          │
+│     ... content ...                            │
+│     ═══ [END UNTRUSTED EXTERNAL DATA] ═══      │
+└──────────────────────────────────────────────┘
+    │
+    ▼
+┌─ LAYER 2: System Prompt (prompt_enhancer.py) ─┐
+│  - LLM instructed to NEVER follow             │
+│    instructions inside UNTRUSTED markers       │
+│  - Data treated as DISPLAY-ONLY               │
+│  - Report injection attempts to user           │
+└──────────────────────────────────────────────┘
+```
+
+### 11.2 Tiered Approval System
+
+```
+Tool Call (execute_terminal / run_code)
+    │
+    ▼
+┌─ Check AUTONOMY_SETTINGS.trust_level ─┐
+│                                        │
+├── "autonomous" ──► Run immediately     │
+│                    Log action           │
+│                                        │
+├── "balanced" ────► Check patterns:     │
+│   │ is_safe_command() OR               │
+│   │ fnmatch(cmd, auto_approve_patterns)│
+│   ├── Match ──► Auto-run               │
+│   └── No match ──► Ask user            │
+│                    + Telegram notify    │
+│                                        │
+├── "cautious" ────► Always ask user     │
+│                                        │
+└────────────────────────────────────────┘
+```
 
 ---
 

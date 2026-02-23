@@ -46,9 +46,12 @@
 | 💻 **Code Execution**    | Write, run, and debug code in multiple languages                   | ✅ Implemented |
 | 🔧 **Terminal Access**   | Execute shell commands and system operations                       | ✅ Implemented |
 | 📁 **File Management**   | Navigate, create, move, and organize files                         | ✅ Implemented |
-| 🔍 **Web Search**        | Search the internet via Brave Search API                           | ✅ Implemented |
+| 🔍 **Web Search**        | Search with citations via Brave, Google, or LangSearch             | ✅ Implemented |
+| 📄 **PDF Reader**        | Read & extract text from PDFs with page markers                    | ✅ Implemented |
 | 📛 **Identity Setup**    | Interactive wizard to customize User and Agent persona             | ✅ Implemented |
-| 🛡️ **HitL Security**     | Human-in-the-Loop required for Terminal and Code execution         | ✅ Implemented |
+| 🛡️ **Injection Defense** | Structural tagging & sanitization of untrusted external data       | ✅ Implemented |
+| ⚡ **Smart Autonomy**    | Tiered trust levels (cautious/balanced/autonomous) for 24/7 ops    | ✅ Implemented |
+| 🧭 **Screen Guidance**   | `/guide` command — capture screen & get AI-powered guidance        | ✅ Implemented |
 
 ---
 
@@ -56,45 +59,52 @@
 
 ```
 MRAgent/
-├── README.md
-├── .env.example          # Template for API keys
-├── .gitignore
+├── main.py               # Entry point & startup
 ├── requirements.txt      # Python dependencies
-├── main.py               # Entry point
+├── .env.example          # Template for API keys
+│
 ├── config/
-│   └── settings.py       # Configuration & API key management
-├── data/
-│   ├── mragent.json      # 🆕 Poneglyph Configuration
-│   └── vivrecard_jobs.json # Scheduled jobs
+│   └── settings.py       # Config, model registry, autonomy settings
 ├── core/
-│   └── poneglyph.py      # 🆕 System Guardian & Doctor
+│   └── poneglyph.py      # System Guardian & Doctor
 ├── agents/
-│   ├── core.py           # Core agent orchestration loop
-│   ├── vivrecard.py      # 🆕 Scheduler system
-│   ├── planner.py        # Task planning & decomposition
-│   └── executor.py       # Action execution engine
-├── skills/               # Modular Skills System
-│   ├── base.py           # Base skill interface
+│   ├── core.py           # Core agent loop + tiered approval logic
+│   ├── prompt_enhancer.py # System prompt & context injection
+│   ├── watcher.py        # Eagle Eye screen monitor
+│   └── vivrecard.py      # Background scheduler
+├── skills/
 │   ├── agentmail.py      # Email skill
 │   └── telegram.py       # Telegram skill
 ├── providers/
-│   ├── base.py           # Base API provider interface
-│   ├── nvidia_llm.py     # NVIDIA LLM provider (GPT-OSS, Kimi, GLM)
-│   ├── nvidia_image.py   # NVIDIA image generation (SD 3.5, FLUX)
-│   ├── tts.py            # Edge TTS provider
-│   ├── nvidia_stt.py     # Groq STT provider
-│   └── brave_search.py   # Brave Search API
+│   ├── nvidia_llm.py     # NVIDIA LLM (GPT-OSS, Kimi, GLM, Qwen)
+│   ├── nvidia_image.py   # Image generation (SD 3.5, FLUX)
+│   ├── tts.py            # Edge TTS
+│   ├── nvidia_stt.py     # Groq STT
+│   ├── brave_search.py   # Brave Search (with citations)
+│   ├── google_search.py  # Google Custom Search
+│   └── langsearch.py     # LangSearch API
 ├── tools/
-│   ├── browser.py        # Web browsing automation
 │   ├── terminal.py       # Shell command execution
-│   └── ...
+│   ├── file_manager.py   # File CRUD operations
+│   ├── browser.py        # Web fetch & search (with sanitizer)
+│   ├── pdf_reader.py     # PDF text extraction
+│   ├── screen.py         # Screen capture & diff
+│   ├── code_runner.py    # Python code execution
+│   └── image_gen.py      # Image generation tool
 ├── ui/
-│   ├── cli.py            # Command-line interface
-│   ├── telegram_bot.py   # Telegram bot interface
-│   └── web.py            # Flask Web Interface
-└── utils/
-    ├── logger.py         # Logging utilities
-    └── helpers.py        # Shared helper functions
+│   ├── cli.py            # Rich CLI (commands, menus, autonomy)
+│   ├── web.py            # Flask Web Interface
+│   └── telegram_bot.py   # Telegram bot
+├── utils/
+│   ├── sanitizer.py      # Prompt injection defense
+│   ├── logger.py         # Logging
+│   └── helpers.py        # Shared utilities
+├── memory/
+│   └── chat_store.py     # SQLite chat persistence
+└── data/                 # Runtime data (gitignored)
+    ├── chats.db
+    ├── images/
+    └── logs/
 ```
 
 ---
@@ -193,13 +203,15 @@ MRAgent is built around **free-tier APIs** to keep costs at zero. Here are the c
 
 ### Other Free Providers
 
-| Provider         | Purpose             | Service                      |
-| ---------------- | ------------------- | ---------------------------- |
-| **Groq**         | Speech-to-Text      | Whisper Large v3 (Free)      |
-| **Edge TTS**     | Text-to-Speech      | Microsoft Edge Neural (Free) |
-| **AgentMail**    | Email               | AgentMail.to (Free)          |
-| **Brave Search** | Web search          | Brave Search API (Free)      |
-| **Telegram**     | Messaging Interface | Telegram Bot API (Free)      |
+| Provider          | Purpose             | Service                       |
+| ----------------- | ------------------- | ----------------------------- |
+| **Groq**          | Speech-to-Text      | Whisper Large v3 (Free)       |
+| **Edge TTS**      | Text-to-Speech      | Microsoft Edge Neural (Free)  |
+| **AgentMail**     | Email               | AgentMail.to (Free)           |
+| **Brave Search**  | Web search          | Brave Search API (Free)       |
+| **Google Search** | Web search          | Custom Search JSON API (Free) |
+| **LangSearch**    | Web search          | LangSearch API (Free)         |
+| **Telegram**      | Messaging Interface | Telegram Bot API (Free)       |
 
 > 💡 **Adding new providers?** Implement the base interface in `providers/base.py` and register your provider in the config.
 
@@ -218,7 +230,7 @@ MRAgent is built around **free-tier APIs** to keep costs at zero. Here are the c
 - [x] Email Integration (AgentMail)
 - [x] VivreCard Scheduler
 - [x] Poneglyph System (Guardian & Doctor)
-- [x] Brave Search integration
+- [x] Multi-provider search (Brave, Google, LangSearch)
 - [x] Terminal & code execution tools
 - [x] File management system
 - [x] Screen monitoring & analysis
@@ -227,6 +239,12 @@ MRAgent is built around **free-tier APIs** to keep costs at zero. Here are the c
 - [x] Security: Web UI & Telegram Authentication
 - [x] Interactive Startup Wizards (API Keys & Identity)
 - [x] NVIDIA API Key Consolidation (Global Defaulting)
+- [x] Prompt injection defense (structural data tagging & sanitization)
+- [x] Smart autonomy system (cautious/balanced/autonomous trust levels)
+- [x] PDF reader tool (page-by-page extraction)
+- [x] Search citations (numbered source URLs in results)
+- [x] Screen guidance pipeline (`/guide` command)
+- [x] UI polish (compact startup, personalized welcome)
 
 ---
 
