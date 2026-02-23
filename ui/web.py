@@ -1226,10 +1226,20 @@ function handleKey(e) {
 
 // ── Format content with markdown + code highlighting ──
 function formatContent(text) {
-  // Detect image file paths and convert to inline images
-  // Pattern: data/images/filename.png or absolute paths ending in .png/.jpg/.jpeg/.webp
+  // Fix broken image markdown: "! [text](url)" → "![text](url)"
+  text = text.replace(/!\s+\[/g, '![');
+
+  // Detect raw /api/images/filename references not already in markdown image syntax
   text = text.replace(
-    /(?:(?:\/[^\s]+\/)?data\/images\/|images\/)([\w._-]+\.(?:png|jpg|jpeg|webp))/gi,
+    /(?<!!)\[?(?:\/api\/images\/)([\w._-]+\.(?:png|jpg|jpeg|webp))/gi,
+    function(match, filename) {
+      return `\n![Generated image](/api/images/${filename})\n`;
+    }
+  );
+
+  // Detect absolute file paths to data/images/ and convert to /api/images/
+  text = text.replace(
+    /(?:(?:\/[^\s]+\/)?data\/images\/)([\w._-]+\.(?:png|jpg|jpeg|webp))/gi,
     function(match, filename) {
       return `\n![Generated image](/api/images/${filename})\n`;
     }
