@@ -40,6 +40,7 @@ class GenerateImageTool(Tool):
         try:
             from providers import get_image
             from agents.prompt_enhancer import PromptEnhancer
+            from pathlib import Path
 
             # Enhance the prompt for better results
             enhanced = PromptEnhancer().build_image_prompt(prompt)
@@ -47,9 +48,17 @@ class GenerateImageTool(Tool):
 
             result = get_image().generate_image(enhanced, model=model)
             filepath = result["filepath"]
+            filename = Path(filepath).name
             self.logger.info(f"Image saved: {filepath}")
 
-            return f"✅ Image generated and saved to: {filepath}\nModel: {model}\nPrompt: {prompt}"
+            # Return markdown image so web UI renders it inline
+            return (
+                f"✅ Image generated!\n\n"
+                f"![{prompt}](/api/images/{filename})\n\n"
+                f"**Prompt:** {prompt}\n"
+                f"**Model:** {model}\n"
+                f"**Saved to:** `{filepath}`"
+            )
 
         except Exception as e:
             self.logger.error(f"Image generation failed: {e}")
