@@ -438,6 +438,7 @@ class CLIInterface:
         
         choices = [
             {"id": "search", "label": "Search Provider    [dim](Google/Brave)[/dim]"},
+            {"id": "google_image", "label": "Google AI Studio   [dim](Image Generation)[/dim]"},
             {"id": "telegram", "label": "Telegram Bot       [dim](@BotFather)[/dim]"},
             {"id": "agentmail", "label": "AgentMail          [dim](Email via API)[/dim]"},
             {"id": "nvidia", "label": "NVIDIA API         [dim](Primary LLM key)[/dim]"},
@@ -453,6 +454,9 @@ class CLIInterface:
 
         if choice == "search":
             self._configure_search_provider()
+        elif choice == "google_image":
+            self._configure_generic_skill("Google AI Studio (Image Gen)", ["GOOGLE_AI_STUDIO_KEY"])
+            self._print_info("💡 Get your free key at: https://aistudio.google.com")
         elif choice == "telegram":
             self._configure_generic_skill("Telegram Bot", ["TELEGRAM_BOT_TOKEN", "ALLOWED_TELEGRAM_CHATS"])
         elif choice == "agentmail":

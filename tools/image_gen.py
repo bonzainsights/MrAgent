@@ -46,17 +46,36 @@ class GenerateImageTool(Tool):
             enhanced = PromptEnhancer().build_image_prompt(prompt)
             self.logger.info(f"Generating image: {enhanced[:80]}...")
 
-            result = get_image().generate_image(enhanced, model=model)
+            provider = get_image()
+            provider_name = getattr(provider, 'name', 'unknown')
+            used_fallback = False
+
+            try:
+                result = provider.generate_image(enhanced, model=model)
+            except Exception as primary_err:
+                # If Google provider fails (quota, error), fallback to NVIDIA
+                if provider_name == "google_image":
+                    self.logger.warning(f"Google image failed ({primary_err}), falling back to NVIDIA FLUX")
+                    from providers.nvidia_image import NvidiaImageProvider
+                    fallback = NvidiaImageProvider()
+                    result = fallback.generate_image(enhanced, model="flux-dev")
+                    used_fallback = True
+                else:
+                    raise
+
             filepath = result["filepath"]
             filename = Path(filepath).name
+            used_model = result.get("model", model)
             self.logger.info(f"Image saved: {filepath}")
+
+            fallback_note = " *(fell back to NVIDIA FLUX)*" if used_fallback else ""
 
             # Return markdown image so web UI renders it inline
             return (
-                f"✅ Image generated!\n\n"
+                f"✅ Image generated!{fallback_note}\n\n"
                 f"![{prompt}](/api/images/{filename})\n\n"
                 f"**Prompt:** {prompt}\n"
-                f"**Model:** {model}\n"
+                f"**Model:** {used_model}\n"
                 f"**Saved to:** `{filepath}`"
             )
 

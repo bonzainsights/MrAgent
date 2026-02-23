@@ -30,12 +30,22 @@ def get_llm():
 
 
 def get_image():
-    """Get the NVIDIA Image provider (singleton)."""
+    """
+    Get the image provider.
+    Priority: Google AI Studio (free) → NVIDIA FLUX (fallback).
+    Google is used ONLY for image generation, never for text/chat.
+    """
     global _image_provider
     if _image_provider is None:
-        from providers.nvidia_image import NvidiaImageProvider
-        _image_provider = NvidiaImageProvider()
-        logger.info("Image provider ready")
+        import os
+        if os.getenv("GOOGLE_AI_STUDIO_KEY"):
+            from providers.google_image import GoogleImageProvider
+            _image_provider = GoogleImageProvider()
+            logger.info("Image provider: Google AI Studio (primary)")
+        else:
+            from providers.nvidia_image import NvidiaImageProvider
+            _image_provider = NvidiaImageProvider()
+            logger.info("Image provider: NVIDIA FLUX (no Google key)")
     return _image_provider
 
 

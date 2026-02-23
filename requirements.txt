@@ -35,3 +35,4 @@ edge-tts>=7.0.0            # Cloud-based Text-to-Speech (free, high quality)
 croniter>=3.0.0            # Cron expression parsing for VivreCard scheduler
 schedule>=1.2.0            # Job scheduling for VivreCard
 PyPDF2>=3.0.0
+google-genai>=1.0.0          # Google AI Studio (image generation)
