@@ -39,26 +39,6 @@ logger = get_logger("main")
 __version__ = "0.1.0"
 
 
-# ──────────────────────────────────────────────
-# Banner
-# ──────────────────────────────────────────────
-BANNER = r"""
- ╔══════════════════════════════════════════════╗
- ║                                              ║
- ║   ███╗   ███╗██████╗  █████╗  ██████╗       ║
- ║   ████╗ ████║██╔══██╗██╔══██╗██╔════╝       ║
- ║   ██╔████╔██║██████╔╝███████║██║  ███╗      ║
- ║   ██║╚██╔╝██║██╔══██╗██╔══██║██║   ██║      ║
- ║   ██║ ╚═╝ ██║██║  ██║██║  ██║╚██████╔╝      ║
- ║   ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝       ║
- ║                                              ║
- ║   MRAgent v{version}                           ║
- ║   Your Lightweight AI Assistant              ║
- ║   Powered by NVIDIA NIM                      ║
- ║                                              ║
- ╚══════════════════════════════════════════════╝
-"""
-
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
@@ -118,27 +98,46 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+# ──────────────────────────────────────────────
+# Banner
+# ──────────────────────────────────────────────
+BANNER = r"""
+ ╔══════════════════════════════════════════════╗
+ ║   ███╗   ███╗██████╗  █████╗  ██████╗       ║
+ ║   ████╗ ████║██╔══██╗██╔══██╗██╔════╝       ║
+ ║   ██╔████╔██║██████╔╝███████║██║  ███╗      ║
+ ║   ██║╚██╔╝██║██╔══██╗██╔══██║██║   ██║      ║
+ ║   ██║ ╚═╝ ██║██║  ██║██║  ██║╚██████╔╝      ║
+ ║   ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝       ║
+ ╚══════════════════════════════════════════════╝
+"""
+
+
 def print_startup_info(args: argparse.Namespace):
     """Print startup banner and configuration summary."""
-    print(BANNER.format(version=__version__))
+    from config.settings import AGENT_NAME, USER_NAME, AUTONOMY_SETTINGS
+
+    print(BANNER)
 
     # Validate API keys
     report = validate_config()
 
-    # Print essential info via print() (console logs are suppressed by default)
-    print(f"  System:  {SYSTEM_INFO['os']} {SYSTEM_INFO['platform']}")
-    print(f"  Python:  {SYSTEM_INFO['python_version']}")
-    print(f"  Mode:    {args.mode} | Voice: {'ON' if args.voice else 'OFF'}")
-    if report["valid"]:
-        print(f"  Models:  {', '.join(report['valid'])}")
+    # Compact status line
+    trust = AUTONOMY_SETTINGS.get("trust_level", "balanced")
+    trust_icons = {"cautious": "🔒", "balanced": "⚖️", "autonomous": "⚡"}
+    model_count = len(report["valid"])
+    mode_str = f"{args.mode}" + (" +voice" if args.voice else "")
+
+    print(f"  {AGENT_NAME} v{__version__} | {SYSTEM_INFO['os']} {SYSTEM_INFO['platform']}")
+    print(f"  Mode: {mode_str} | Models: {model_count} | Trust: {trust_icons.get(trust, '❓')} {trust}")
+
     if report["missing"]:
-        print(f"  ⚠ Missing API keys: {', '.join(report['missing'])}")
-    for warning in report["warnings"]:
+        print(f"  ⚠ Missing keys: {', '.join(report['missing'][:3])}{'...' if len(report['missing']) > 3 else ''}")
+    for warning in report["warnings"][:2]:
         print(f"  ⚠ {warning}")
-    print(f"  Logs:    data/logs/mragent.log")
     print()
 
-    # Still log to file for tracking
+    # Log (not printed to console)
     logger.info(f"MRAgent v{__version__} starting — mode={args.mode}")
     logger.info(f"System: {SYSTEM_INFO['os']} {SYSTEM_INFO['platform']}")
     logger.info(f"Models: {', '.join(report['valid'])}")

@@ -672,9 +672,11 @@ class CLIInterface:
     # ──────────────────────────────────────────────
 
     def _print_welcome(self):
-        """Print welcome message."""
+        """Print welcome message with quick tips."""
+        from config.settings import USER_NAME, AGENT_NAME
         print()
-        self._print_info("MRAgent is ready! Type your message or /help for commands.")
+        self._print_info(f"Hey {USER_NAME}! {AGENT_NAME} is ready.")
+        self._print_dim("  💡 Tips: /help for commands | /guide for screen help | /autonomy to set trust level")
         print()
 
     def _print_help(self):
