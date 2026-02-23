@@ -146,6 +146,10 @@ def print_startup_info(args: argparse.Namespace):
     backup_path = save_config_backup()
     logger.debug(f"Config backup saved: {backup_path}")
 
+    # Auto-clean old data (images >7d, uploads >3d, logs >30d)
+    from utils.cleanup import run_startup_cleanup
+    run_startup_cleanup()
+
     # Start VivreCard Scheduler
     vivrecard = VivreCard()
     vivrecard.start()

@@ -34,7 +34,7 @@ def require_auth(f):
 
 from agents.core import AgentCore
 from agents.model_selector import ModelSelector
-from config.settings import MODEL_REGISTRY, IMAGES_DIR
+from config.settings import MODEL_REGISTRY, IMAGES_DIR, DATA_DIR
 from memory.chat_store import ChatStore
 from utils.logger import get_logger
 
