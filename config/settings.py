@@ -287,7 +287,7 @@ MODEL_REGISTRY = {
 # ──────────────────────────────────────────────
 DEFAULTS = {
     "default_llm": "llama-3.3-70b",
-    "default_image_model": "sd-3.5-large",
+    "default_image_model": "flux-dev",
     "model_selection_mode": "auto",    # auto | thinking | fast | code
     "voice_enabled": False,
     "web_port": 7860,

@@ -1,10 +1,10 @@
 """
 MRAgent — Image Generation Tool
 Allows the LLM to generate images during conversation.
-Supports aspect ratio selection and Google→FLUX automatic fallback.
+Supports aspect ratio selection. Default: NVIDIA FLUX, optional Google override.
 
 Created: 2026-02-16
-Updated: 2026-02-23 — Google AI Studio primary, aspect ratio support
+Updated: 2026-02-24 — FLUX default, Google optional via IMAGE_PROVIDER env var
 """
 
 from tools.base import Tool
@@ -14,7 +14,7 @@ logger = get_logger("tools.image_gen")
 
 
 class GenerateImageTool(Tool):
-    """Generate an image from a text prompt using Google AI Studio or NVIDIA."""
+    """Generate an image from a text prompt using NVIDIA FLUX (default) or Google AI Studio."""
 
     name = "generate_image"
     description = (
@@ -59,7 +59,7 @@ class GenerateImageTool(Tool):
                     aspect_ratio=aspect_ratio,
                 )
             except Exception as primary_err:
-                # If Google provider fails (quota, error), fallback to NVIDIA
+                # If Google provider fails (quota, error), fall back to NVIDIA FLUX
                 if provider_name == "google_image":
                     self.logger.warning(f"Google image failed ({primary_err}), falling back to NVIDIA FLUX")
                     from providers.nvidia_image import NvidiaImageProvider

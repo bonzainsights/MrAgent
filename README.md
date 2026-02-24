@@ -31,27 +31,27 @@
 
 ## 🚀 Features
 
-| Capability               | Description                                                        | Status         |
-| ------------------------ | ------------------------------------------------------------------ | -------------- |
-| 💬 **LLM Chat**          | Multi-model text generation (GPT-OSS, Kimi, GLM-5, Llama 3.3)      | ✅ Implemented |
-| 🎨 **Image Generation**  | Text-to-image via Stable Diffusion 3.5 Large & FLUX Dev            | ✅ Implemented |
-| 🗣️ **Text-to-Speech**    | Natural voice synthesis via **Edge TTS** (Free, Neutral)           | ✅ Implemented |
-| 👂 **Speech-to-Text**    | Audio transcription via **Groq Whisper v3** (Ultra-fast)           | ✅ Implemented |
-| 📧 **Email Skill**       | Send & receive emails via AgentMail (Interactive `/email` command) | ✅ Implemented |
-| 📱 **Telegram Bot**      | Chat, Voice, & Image interaction                                   | ✅ Implemented |
-| 💓 **VivreCard**         | Background Scheduler & Heartbeat System                            | ✅ Implemented |
-| 🛡️ **Poneglyph**         | System Guardian & Doctor (Auto-diagnostics)                        | ✅ Implemented |
-| 🌐 **Web Browsing**      | Autonomous internet surfing and information gathering              | ✅ Implemented |
-| 🖥️ **Screen Monitoring** | Capture and analyze screen content in real-time                    | ✅ Implemented |
-| 💻 **Code Execution**    | Write, run, and debug code in multiple languages                   | ✅ Implemented |
-| 🔧 **Terminal Access**   | Execute shell commands and system operations                       | ✅ Implemented |
-| 📁 **File Management**   | Navigate, create, move, and organize files                         | ✅ Implemented |
-| 🔍 **Web Search**        | Search with citations via Brave, Google, or LangSearch             | ✅ Implemented |
-| 📄 **PDF Reader**        | Read & extract text from PDFs with page markers                    | ✅ Implemented |
-| 📛 **Identity Setup**    | Interactive wizard to customize User and Agent persona             | ✅ Implemented |
-| 🛡️ **Injection Defense** | Structural tagging & sanitization of untrusted external data       | ✅ Implemented |
-| ⚡ **Smart Autonomy**    | Tiered trust levels (cautious/balanced/autonomous) for 24/7 ops    | ✅ Implemented |
-| 🧭 **Screen Guidance**   | `/guide` command — capture screen & get AI-powered guidance        | ✅ Implemented |
+| Capability               | Description                                                          | Status         |
+| ------------------------ | -------------------------------------------------------------------- | -------------- |
+| 💬 **LLM Chat**          | Multi-model text generation (GPT-OSS, Kimi, GLM-5, Llama 3.3)        | ✅ Implemented |
+| 🎨 **Image Generation**  | Text-to-image via FLUX.1 Dev (default) & Google AI Studio (optional) | ✅ Implemented |
+| 🗣️ **Text-to-Speech**    | Natural voice synthesis via **Edge TTS** (Free, Neutral)             | ✅ Implemented |
+| 👂 **Speech-to-Text**    | Audio transcription via **Groq Whisper v3** (Ultra-fast)             | ✅ Implemented |
+| 📧 **Email Skill**       | Send & receive emails via AgentMail (Interactive `/email` command)   | ✅ Implemented |
+| 📱 **Telegram Bot**      | Chat, Voice, & Image interaction                                     | ✅ Implemented |
+| 💓 **VivreCard**         | Background Scheduler & Heartbeat System                              | ✅ Implemented |
+| 🛡️ **Poneglyph**         | System Guardian & Doctor (Auto-diagnostics)                          | ✅ Implemented |
+| 🌐 **Web Browsing**      | Autonomous internet surfing and information gathering                | ✅ Implemented |
+| 🖥️ **Screen Monitoring** | Capture and analyze screen content in real-time                      | ✅ Implemented |
+| 💻 **Code Execution**    | Write, run, and debug code in multiple languages                     | ✅ Implemented |
+| 🔧 **Terminal Access**   | Execute shell commands and system operations                         | ✅ Implemented |
+| 📁 **File Management**   | Navigate, create, move, and organize files                           | ✅ Implemented |
+| 🔍 **Web Search**        | Search with citations via Brave, Google, or LangSearch               | ✅ Implemented |
+| 📄 **PDF Reader**        | Read & extract text from PDFs with page markers                      | ✅ Implemented |
+| 📛 **Identity Setup**    | Interactive wizard to customize User and Agent persona               | ✅ Implemented |
+| 🛡️ **Injection Defense** | Structural tagging & sanitization of untrusted external data         | ✅ Implemented |
+| ⚡ **Smart Autonomy**    | Tiered trust levels (cautious/balanced/autonomous) for 24/7 ops      | ✅ Implemented |
+| 🧭 **Screen Guidance**   | `/guide` command — capture screen & get AI-powered guidance          | ✅ Implemented |
 
 ---
 
@@ -117,7 +117,7 @@ MRAgent/
 - Free API keys (see [API Providers](#api-providers))
 - <a href="https://build.nvidia.com/models">Nvidia</a>
 - <a href="https://groq.com">Groq</a>
-- <a href="https://aistudio.google.com">Google AI Studio</a> `for image generation !!no card connection needed & there is daily limit once limit reached fallback to Flux/SD3.5`
+- <a href="https://aistudio.google.com">Google AI Studio</a> `(optional) set IMAGE_PROVIDER=google in .env to use instead of FLUX`
 - <a href="https://brave.com/search/api/">Brave</a> `you can just use langsearch but brave gives better results`
 - <a href="https://langsearch.com">LangSearch</a>
 - <a href="https://agentmail.to">AgentMail</a>
@@ -197,15 +197,15 @@ MRAgent is built around **free-tier APIs** to keep costs at zero. Here are the c
 
 ### NVIDIA NIM (Primary)
 
-| Model                      | Purpose             | API        |
-| -------------------------- | ------------------- | ---------- |
-| GPT-OSS-120B               | Reasoning (Primary) | NVIDIA NIM |
-| Kimi K2.5                  | General-purpose LLM | NVIDIA NIM |
-| GLM-5                      | Reasoning & code    | NVIDIA NIM |
-| Llama 3.3 70B              | Reliable fallback   | NVIDIA NIM |
-| Qwen2.5 Coder              | Code generation     | NVIDIA NIM |
-| Stable Diffusion 3.5 Large | Image generation    | NVIDIA NIM |
-| FLUX.1 Dev                 | Image generation    | NVIDIA NIM |
+| Model                     | Purpose                     | API        |
+| ------------------------- | --------------------------- | ---------- |
+| GPT-OSS-120B              | Reasoning (Primary)         | NVIDIA NIM |
+| Kimi K2.5                 | General-purpose LLM         | NVIDIA NIM |
+| GLM-5                     | Reasoning & code            | NVIDIA NIM |
+| Llama 3.3 70B             | Reliable fallback           | NVIDIA NIM |
+| Qwen2.5 Coder             | Code generation             | NVIDIA NIM |
+| FLUX.1 Dev                | Image generation (default)  | NVIDIA NIM |
+| Stable Diffusion 3 Medium | Image generation (fallback) | NVIDIA NIM |
 
 ### Other Free Providers
 
