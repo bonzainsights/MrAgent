@@ -34,6 +34,7 @@ COMMANDS = {
     "/email":    "Send an email interactively",
     "/identity": "Change your name or the agent's name",
     "/autonomy": "Set trust level (cautious/balanced/autonomous)",
+    "/auto":     "Directory-scoped auto mode (e.g. /auto . or /auto off)",
     "/watch":    "Start Eagle Eye Watcher mode",
     "/exit":     "Exit MRAgent",
 }
@@ -356,6 +357,9 @@ class CLIInterface:
         elif command == "/autonomy":
             self._configure_autonomy()
 
+        elif command == "/auto":
+            self._configure_auto(arg)
+
         else:
             self._print_info(f"Unknown command: {command}. Type /help for commands.")
 
@@ -629,6 +633,44 @@ class CLIInterface:
                 self._print_info("⚠️  The agent will now execute ALL commands without asking. Use with caution.")
         else:
             self._print_info("Cancelled.")
+
+    def _configure_auto(self, arg: str):
+        """Configure directory-scoped autonomous mode."""
+        from config.settings import AUTONOMY_SETTINGS
+
+        if not arg:
+            # Show status
+            if AUTONOMY_SETTINGS.get("auto_session_active"):
+                auto_dir = AUTONOMY_SETTINGS.get("auto_directory", "")
+                self._print_info(f"🟢 Auto mode is ACTIVE in: {auto_dir}")
+                self._print_info("  Use /auto off to disable.")
+            else:
+                self._print_info("🔴 Auto mode is OFF")
+                self._print_info("  Usage: /auto <directory>  — Grant agent permission to work freely in a project dir")
+                self._print_info("         /auto .            — Use current directory")
+                self._print_info("         /auto off          — Disable auto mode")
+            return
+
+        if arg.lower() == "off":
+            AUTONOMY_SETTINGS["auto_session_active"] = False
+            AUTONOMY_SETTINGS["auto_directory"] = None
+            self._print_info("🔴 Auto mode disabled. Agent will ask for approval as usual.")
+            return
+
+        # Resolve directory
+        target_dir = os.path.abspath(os.path.expanduser(arg))
+        if not os.path.isdir(target_dir):
+            self._print_info(f"❌ Directory not found: {target_dir}")
+            return
+
+        AUTONOMY_SETTINGS["auto_directory"] = target_dir
+        AUTONOMY_SETTINGS["auto_session_active"] = True
+
+        self._print_info(f"\n⚡ Auto mode ENABLED")
+        self._print_info(f"  📂 Scope: {target_dir}")
+        self._print_info(f"  ✅ Agent can freely run project commands within this directory")
+        self._print_info(f"  🛡️  Blocked: rm -rf, sudo, shutdown, commands outside this directory")
+        self._print_info(f"  Use /auto off when done.")
 
     def _configure_search_provider(self):
         """Specific configuration for search providers."""

@@ -22,7 +22,7 @@ logger = get_logger("agents.model_selector")
 MODE_DEFAULTS = {
     "thinking": "qwen3-235b",
     "fast": "llama-3.3-70b",
-    "code": "qwen3-235b",
+    "code": "qwen3-coder",
     "browsing": "llama-3.3-70b",
     "general": "llama-3.3-70b",
     "image": "llama-3.2-11b-vision"

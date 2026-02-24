@@ -61,6 +61,11 @@ class TerminalTool(Tool):
                 return f"⚠️ Blocked: command matches safety blacklist ({blocked})"
 
         cwd = working_directory or os.getcwd()
+
+        # Validate working directory exists
+        if not os.path.isdir(cwd):
+            return f"❌ Working directory does not exist: {cwd}. Use list_files to verify paths before operating."
+
         self.logger.info(f"Executing: {command} (cwd={cwd}, timeout={timeout}s)")
 
         try:

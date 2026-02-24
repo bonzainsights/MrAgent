@@ -321,6 +321,42 @@ class AgentCore:
 
                 return base_cmd in safe_cmds
 
+            # Helper: check if command is allowed under /auto directory scope
+            def is_auto_approved(cmd: str, working_dir: str = None) -> bool:
+                """Check if command is safe to auto-run within the /auto scoped directory."""
+                if not AUTONOMY_SETTINGS.get("auto_session_active"):
+                    return False
+                auto_dir = AUTONOMY_SETTINGS.get("auto_directory")
+                if not auto_dir:
+                    return False
+
+                # Always block dangerous commands even in auto mode
+                dangerous = ['rm -rf /', 'rm -rf /*', 'sudo ', 'shutdown', 'reboot',
+                             'mkfs', 'dd if=', ':(){', 'halt', 'chmod 777 /',
+                             'rm -rf ~', 'rm -rf $HOME']
+                cmd_lower = cmd.lower().strip()
+                for d in dangerous:
+                    if d in cmd_lower:
+                        return False
+
+                # Resolve working directory — must be within the auto scope
+                import os
+                resolved_cwd = os.path.abspath(working_dir) if working_dir else os.getcwd()
+                auto_dir_resolved = os.path.abspath(auto_dir)
+
+                if not resolved_cwd.startswith(auto_dir_resolved):
+                    return False
+
+                # Check if command references absolute paths outside the scope
+                # Simple heuristic: look for absolute paths in the command
+                import re as _re
+                abs_paths = _re.findall(r'(?:^|\s)(/[^\s]+)', cmd)
+                for p in abs_paths:
+                    if not os.path.abspath(p).startswith(auto_dir_resolved):
+                        return False
+
+                return True
+
             # ── Tiered Approval Logic ──
             if func_name == "execute_terminal":
                 cmd_to_run = func_args.get("command", "")
@@ -331,8 +367,13 @@ class AgentCore:
                     self._emit("info", f"⚡ [autonomous] Running: {cmd_to_run[:80]}")
 
                 elif trust_level == "balanced":
+                    # Check /auto directory-scoped approval first
+                    working_dir = func_args.get("working_directory")
+                    if is_auto_approved(cmd_to_run, working_dir):
+                        logger.info(f"[AUTO-SCOPE] Auto-approved in {AUTONOMY_SETTINGS.get('auto_directory')}: {cmd_to_run}")
+                        self._emit("info", f"⚡ [auto] Running: {cmd_to_run[:80]}")
                     # Balanced: auto-run if safe OR matches patterns; otherwise ask
-                    if not is_safe_command(cmd_to_run) and not matches_auto_approve(cmd_to_run):
+                    elif not is_safe_command(cmd_to_run) and not matches_auto_approve(cmd_to_run):
                         if self.approval_callback:
                             tool_desc = f"⚠️ Agent wants to run a command:\n```bash\n{cmd_to_run}\n```"
                             self._emit("approval_required", tool_desc)

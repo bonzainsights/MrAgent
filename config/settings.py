@@ -110,8 +110,6 @@ AUTONOMY_SETTINGS = {
         "node *",
         "mkdir *",
         "touch *",
-        "cp *",
-        "mv *",
         "cat *",
         "head *",
         "tail *",
@@ -126,8 +124,6 @@ AUTONOMY_SETTINGS = {
         "whoami",
         "date",
         "tree *",
-        "curl *",    # For API testing — can be removed if too risky
-        "brew *",
     ],
 
     # Notify via Telegram when an approval is pending (balanced mode)
@@ -135,6 +131,11 @@ AUTONOMY_SETTINGS = {
 
     # Auto-reject pending approvals after this many minutes (0 = wait forever)
     "queue_timeout_minutes": int(os.getenv("QUEUE_TIMEOUT_MINUTES", "30")),
+
+    # Directory-scoped autonomous mode (set via /auto command)
+    # When active, agent can run project-safe commands freely within this directory
+    "auto_directory": None,
+    "auto_session_active": False,
 }
 
 
@@ -190,17 +191,17 @@ MODEL_REGISTRY = {
 
     # ── Code ──
     "qwen3-coder": {
-        "id": "qwen3-coder-480b-a35b-instruct",
+        "id": "qwen/qwen3-coder-480b-a35b-instruct",
         "key": "qwen3_coder",
         "type": "llm",
         "categories": ["code"],
         "context_window": 262_144,
         "supports_tools": True,
-        "description": "480B MoE agentic coder, 1M context",
+        "description": "480B MoE agentic coder, 256K context",
     },
 
     "qwen3-235b": {
-        "id": "qwen3-235b-a22b",
+        "id": "qwen/qwen3-235b-a22b",
         "key": "qwen3_235b",
         "type": "llm",
         "categories": ["thinking", "code"],

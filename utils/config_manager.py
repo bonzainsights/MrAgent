@@ -26,10 +26,10 @@ def update_env_key(key: str, value: str, env_path: str = None) -> bool:
         try:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(f"{key}={value}\n")
-            logger.info(f"Created {env_path} with {key}")
+            logger.info(f"Created {path} with {key}")
             return True
         except Exception as e:
-            logger.error(f"Failed to create {env_path}: {e}")
+            logger.error(f"Failed to create {path}: {e}")
             return False
 
     # Read existing lines
@@ -37,7 +37,7 @@ def update_env_key(key: str, value: str, env_path: str = None) -> bool:
         with open(path, "r", encoding="utf-8") as f:
             lines = f.readlines()
     except Exception as e:
-        logger.error(f"Failed to read {env_path}: {e}")
+        logger.error(f"Failed to read {path}: {e}")
         return False
 
     key_found = False
@@ -62,8 +62,8 @@ def update_env_key(key: str, value: str, env_path: str = None) -> bool:
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
-        logger.info(f"Updated {key} in {env_path}")
+        logger.info(f"Updated {key} in {path}")
         return True
     except Exception as e:
-        logger.error(f"Failed to write {env_path}: {e}")
+        logger.error(f"Failed to write {path}: {e}")
         return False
