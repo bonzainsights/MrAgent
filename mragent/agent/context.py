@@ -135,6 +135,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             return text
 
         images = []
+        attached_texts = []
         for path in media:
             p = Path(path)
             if not p.is_file():
@@ -143,13 +144,18 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             # Detect real MIME type from magic bytes; fallback to filename guess
             mime = detect_image_mime(raw) or mimetypes.guess_type(path)[0]
             if not mime or not mime.startswith("image/"):
+                attached_texts.append(f"Attached file: {path}")
                 continue
             b64 = base64.b64encode(raw).decode()
             images.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
 
+        final_text = text
+        if attached_texts:
+            final_text = "\n".join(attached_texts) + "\n\n" + text
+
         if not images:
-            return text
-        return images + [{"type": "text", "text": text}]
+            return final_text
+        return images + [{"type": "text", "text": final_text}]
 
     def add_tool_result(
         self, messages: list[dict[str, Any]],

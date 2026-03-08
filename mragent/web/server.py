@@ -54,6 +54,7 @@ class WebServer:
         app.router.add_post("/api/chat", self._handle_chat)
         app.router.add_get("/ws", self._handle_ws)
         app.router.add_post("/api/voice", self._handle_voice)
+        app.router.add_post("/api/upload", self._handle_upload)
         app.router.add_get("/api/status", self._handle_status)
         app.router.add_get("/api/models", self._handle_models)
         app.router.add_post("/api/config", self._handle_config)
@@ -105,7 +106,8 @@ class WebServer:
 
         message = (body.get("message") or "").strip()
         session_id = body.get("session", "web:user")
-        if not message:
+        media = body.get("media") or []
+        if not message and not media:
             return web.json_response({"error": "Empty message"}, status=400)
 
         try:
@@ -114,6 +116,7 @@ class WebServer:
                 session_key=session_id,
                 channel="web",
                 chat_id="user",
+                media=media,
             )
             return web.json_response({"response": response or ""})
         except Exception as e:
@@ -189,7 +192,8 @@ class WebServer:
 
                     message = (data.get("message") or "").strip()
                     session_id = data.get("session", "web:user")
-                    if not message:
+                    media = data.get("media") or []
+                    if not message and not media:
                         continue
 
                     chunks: list[str] = []
@@ -209,6 +213,7 @@ class WebServer:
                             channel="web",
                             chat_id="user",
                             on_progress=_progress,
+                            media=media,
                         )
                         if not ws.closed:
                             await ws.send_json({"type": "response", "content": response or ""})
@@ -264,6 +269,44 @@ class WebServer:
 
         except Exception as e:
             logger.error("Voice transcription error: {}", e)
+            return web.json_response({"error": str(e)}, status=500)
+
+    # ------------------------------------------------------------------
+    # File upload
+    # ------------------------------------------------------------------
+
+    async def _handle_upload(self, request: web.Request) -> web.Response:
+        """POST /api/upload — multipart file upload."""
+        try:
+            reader = await request.multipart()
+            field = await reader.next()
+            if field is None:
+                return web.json_response({"error": "No file data"}, status=400)
+
+            filename = field.filename or "uploaded_file"
+            
+            # Save file to workspace
+            uploads_dir = self.agent.workspace / "uploads"
+            uploads_dir.mkdir(parents=True, exist_ok=True)
+            
+            # basic sanitization
+            safe_name = "".join(c for c in filename if c.isalnum() or c in "._- ")
+            file_path = uploads_dir / f"{int(asyncio.get_event_loop().time())}_{safe_name}"
+            
+            with open(file_path, "wb") as f:
+                while True:
+                    chunk = await field.read_chunk(65536)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            
+            return web.json_response({
+                "path": str(file_path.absolute()),
+                "filename": safe_name,
+            })
+
+        except Exception as e:
+            logger.error("File upload error: {}", e)
             return web.json_response({"error": str(e)}, status=500)
 
     # ------------------------------------------------------------------
