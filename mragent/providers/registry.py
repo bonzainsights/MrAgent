@@ -408,6 +408,26 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_oauth=True,
         is_direct=True,
     ),
+    # Qwen Portal: secure Device Authorization Flow, no API key needed.
+    # is_direct=True so it bypasses LiteLLM; is_oauth=True to skip key check.
+    ProviderSpec(
+        name="qwen_portal",
+        keywords=("qwen_portal", "portal/qwen"),
+        env_key="",            # OAuth-based, no API key
+        display_name="Qwen Portal (Secure OAuth)",
+        litellm_prefix="",
+        skip_prefixes=(),
+        env_extras=(),
+        is_gateway=False,
+        is_local=False,
+        detect_by_key_prefix="",
+        detect_by_base_keyword="",
+        default_api_base="https://portal.qwen.ai/v1",
+        strip_model_prefix=False,
+        model_overrides=(),
+        is_oauth=True,
+        is_direct=True,
+    ),
 )
 
 

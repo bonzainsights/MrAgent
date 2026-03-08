@@ -251,10 +251,12 @@ def _make_provider(config: Config):
     if provider_name == "openai_codex" or model.startswith("openai-codex/"):
         return OpenAICodexProvider(default_model=model)
 
+    # Qwen Portal (secure Device Authorization Flow)
+    if provider_name == "qwen_portal":
+        from mragent.providers.qwen_portal_provider import QwenPortalProvider
+        return QwenPortalProvider(default_model=model)
+
     # Qwen OAuth (free browser-based, no API key)
-    if provider_name == "qwen_oauth":
-        from mragent.providers.qwen_oauth_provider import QwenOAuthProvider
-        return QwenOAuthProvider(default_model=model)
 
     # Custom: direct OpenAI-compatible endpoint, bypasses LiteLLM
     from mragent.providers.custom_provider import CustomProvider
@@ -761,7 +763,40 @@ def channels_status():
         em_config
     )
 
-    console.print(table)
+
+# ============================================================================
+# Provider Management
+# ============================================================================
+
+
+provider_app = typer.Typer(help="Manage LLM providers")
+app.add_typer(provider_app, name="provider")
+
+
+@provider_app.command("logout")
+def provider_logout(
+    name: str = typer.Argument(..., help="Provider name (e.g., qwen-portal, qwen-oauth)")
+):
+    """Log out from a provider by clearing its cached token."""
+    from pathlib import Path
+
+    # Map names to token files
+    token_map = {
+        "qwen-portal": Path.home() / ".mragent" / "qwen_portal_token.json",
+        "qwen-oauth": Path.home() / ".mragent" / "qwen_token.json",
+        "openai-codex": Path.home() / ".mragent" / "openai_codex_token.json",
+    }
+
+    token_file = token_map.get(name.lower().replace("_", "-"))
+    if not token_file:
+        console.print(f"[red]Unknown provider: {name}[/red]")
+        return
+
+    if token_file.exists():
+        token_file.unlink()
+        console.print(f"[green]✓[/green] Logged out from [cyan]{name}[/cyan] (cleared {token_file})")
+    else:
+        console.print(f"[yellow]You are already logged out from {name}.[/yellow]")
 
 
 def _get_bridge_dir() -> Path:
